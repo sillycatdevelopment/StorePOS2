@@ -7,7 +7,7 @@ using StorePos.Web.Infrastructure;
 
 namespace StorePos.Web.Pages;
 
-public class IndexModel(ReportService reports, InventoryService inventory, CustomerRequestService requests,
+public class IndexModel(SettingsService settings, ReportService reports, InventoryService inventory, CustomerRequestService requests,
                         SupplierService suppliers, TrendService trends, SalesService sales, CashService cash, IClock clock) : AppPageModel
 {
     public PeriodSummary Today { get; private set; } = null!;
@@ -23,10 +23,12 @@ public class IndexModel(ReportService reports, InventoryService inventory, Custo
     public DailyClosing? OpenDay { get; private set; }
     public CashSummary? Cash { get; private set; }
     public DateOnly Date { get; private set; }
+    public bool StartupMode { get; private set; }
 
     public async Task OnGetAsync()
     {
         Date = clock.Today;
+        StartupMode = await settings.GetBoolAsync(SettingKeys.StartupInventoryMode);
         Today = await reports.GetSummaryAsync(Date, Date);
         InventoryValue = await inventory.GetInventoryValueAsync();
         (OutCount, LowCount) = await inventory.CountOutAndLowAsync();

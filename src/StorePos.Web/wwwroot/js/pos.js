@@ -8,6 +8,8 @@
   var isManager = root.dataset.manager === '1';
   var manualMode = root.dataset.mode === '0';
   var registerOpen = root.dataset.open === '1';
+  var startupMode = root.dataset.startup === '1';      // sell untracked stock and record it as initial inventory
+  var canRegister = root.dataset.canRegister === '1';  // may register unknown barcodes from here
   var allOwners = JSON.parse(root.dataset.owners || '[]');
   var token = document.querySelector('input[name="__RequestVerificationToken"]').value;
   var fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
@@ -46,7 +48,8 @@
       existing = { key: ++keySeq, p: p, ownerId: ownerId, qty: p.unit === 1 ? 1000 : 1, disc: 0 };
       cart.push(existing);
     }
-    if (stockOf(p, null) <= 0) say('“' + p.name + '” no tiene existencia registrada.', 'error');
+    if (stockOf(p, null) <= 0) say(startupMode ? '“' + p.name + '” no tiene existencia registrada: se registrará como inventario inicial al cobrar.'
+                                               : '“' + p.name + '” no tiene existencia registrada.', startupMode ? '' : 'error');
     else say('Agregado: ' + p.name, 'ok');
     render();
     if (p.unit === 1) {   // weighed product: go straight to the quantity
@@ -80,7 +83,7 @@
       cartBody.innerHTML = cart.map(function (l) {
         var needOwner = l.p.needsOwnerChoice && l.ownerId === null;
         var avail = stockOf(l.p, l.ownerId);
-        var short = l.qty > avail;
+        var short = l.qty > avail && !startupMode;
         return '<tr data-key="' + l.key + '">' +
           '<td>' + esc(l.p.name) + (short ? ' <span class="badge bad">existencia: ' + fmtQty(l.p, avail) + '</span>' : '') + '</td>' +
           '<td><select class="owner' + (needOwner ? ' need-owner' : '') + '">' + ownerOptions(l) + '</select></td>' +
@@ -167,7 +170,10 @@
       if (r.found) { add(r.product); scan.value = ''; hideResults(); return; }
       return get('/Pos?handler=Search&q=' + encodeURIComponent(text)).then(function (list) {
         if (list.length === 1) { add(list[0]); scan.value = ''; hideResults(); }
-        else if (list.length === 0) { beep(); say('No se encontró “' + text + '”. ¿Registrarlo como producto solicitado?', 'error'); scan.select(); }
+        else if (list.length === 0) {
+          if (canRegister) { openQuick(text); say('Código nuevo: regístralo para venderlo.'); }
+          else { beep(); say('No se encontró “' + text + '”. Pide a un encargado que lo dé de alta.', 'error'); scan.select(); }
+        }
         else { showResults(list); say(list.length + ' resultados: usa ↑ ↓ y Enter.'); }
       });
     }).catch(function () { say('Error de conexión con el servidor.', 'error'); });
@@ -185,6 +191,57 @@
     if (text.length < 2 || /^\d+$/.test(text)) { hideResults(); return; }
     searchTimer = setTimeout(function () { search(text); }, 250);
   });
+
+  // ---------------------------------------------------------------- quick product registration
+
+  var quick = $('quick');
+  function openQuick(text) {
+    if (!quick) return;
+    hideResults();
+    var t = (text || '').trim();
+    var isCode = /^[0-9A-Za-z\-]{4,}$/.test(t) && /\d/.test(t) && !/\s/.test(t);
+    $('qBarcode').value = isCode ? t : '';
+    $('qName').value = isCode ? '' : t;
+    ['qPrice', 'qCost', 'qShelf', 'qMin'].forEach(function (id) { $(id).value = ''; });
+    $('qUnit').value = '0';
+    quick.hidden = false;
+    (isCode || !t ? $('qName') : $('qPrice')).focus();
+    scan.value = '';
+  }
+  function closeQuick() { if (quick) { quick.hidden = true; scan.focus(); } }
+  if (quick) {
+    $('openQuick').addEventListener('click', function () { openQuick(scan.value); });
+    $('cancelQuick').addEventListener('click', closeQuick);
+    quick.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (busy) return;
+      var unit = +$('qUnit').value, sc = unit === 1 ? 1000 : 1;
+      var body = {
+        name: $('qName').value.trim(),
+        barcode: $('qBarcode').value.trim() || null,
+        categoryId: $('qCategory').value ? +$('qCategory').value : null,
+        unit: unit,
+        salePriceCents: Math.round((parseFloat($('qPrice').value) || 0) * 100),
+        purchasePriceCents: Math.round((parseFloat($('qCost').value) || 0) * 100),
+        minStock: Math.round((parseFloat($('qMin').value) || 0) * sc),
+        ownerId: $('qOwner').value ? +$('qOwner').value : null,
+        shelfQty: Math.round((parseFloat($('qShelf').value) || 0) * sc)
+      };
+      if (unit === 0 && (body.shelfQty !== Math.round(body.shelfQty))) { say('La existencia por pieza debe ser un número entero.', 'error'); return; }
+      busy = true;
+      fetch('/Pos?handler=QuickAdd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+        body: JSON.stringify(body)
+      }).then(function (r) { return r.json(); }).then(function (r) {
+        if (!r.ok) { say(r.error, 'error'); return; }
+        quick.hidden = true;
+        add(r.product);
+        say('Producto registrado y agregado: ' + r.product.name, 'ok');
+      }).catch(function () { say('No se pudo contactar al servidor.', 'error'); })
+        .finally(function () { busy = false; });
+    });
+  }
 
   // ---------------------------------------------------------------- payment
 
@@ -254,7 +311,9 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'F2') { e.preventDefault(); scan.focus(); scan.select(); }
     else if (e.key === 'F9') { e.preventDefault(); pay(); }
+    else if (e.key === 'F4' && quick) { e.preventDefault(); openQuick(scan.value); }
     else if (e.key === 'Escape') {
+      if (quick && !quick.hidden) { closeQuick(); return; }
       if (!results.hidden) { hideResults(); return; }
       var now = Date.now();
       if (now - lastEsc < 600 && cart.length) { cart = []; render(); say('Venta vaciada.'); }

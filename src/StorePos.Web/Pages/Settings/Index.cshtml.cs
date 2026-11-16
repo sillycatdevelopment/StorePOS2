@@ -7,19 +7,21 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Settings;
 
 [Authorize(Policy = Policies.Admin)]
-public class IndexModel(SettingsService settings, SalesService sales, DeletionService deletion) : AppPageModel
+public class IndexModel(SettingsService settings, SalesService sales, DeletionService deletion, OwnerService owners) : AppPageModel
 {
     public Dictionary<string, string> Values { get; private set; } = new();
     public List<PaymentMethod> Methods { get; private set; } = new();
+    public List<Owner> Owners { get; private set; } = new();
 
     public async Task OnGetAsync()
     {
         foreach (var key in SettingsService.Defaults.Keys) Values[key] = await settings.GetAsync(key);
         Methods = await sales.GetPaymentMethodsAsync(true);
+        Owners = await owners.GetAllAsync(includeInactive: false);
     }
 
     public async Task<IActionResult> OnPostAsync(string storeName, string receiptFooter, AllocationMode allocationMode,
-        int lowStockMargin, int safetyDays, int defaultCycleDays, int historyDays)
+        int lowStockMargin, int safetyDays, int defaultCycleDays, int historyDays, bool startupMode, int? defaultOwnerId)
     {
         await TryAsync(() => settings.SetManyAsync(new Dictionary<string, string>
         {
@@ -30,6 +32,8 @@ public class IndexModel(SettingsService settings, SalesService sales, DeletionSe
             [SettingKeys.SafetyDays] = Math.Clamp(safetyDays, 0, 60).ToString(),
             [SettingKeys.DefaultCycleDays] = Math.Clamp(defaultCycleDays, 1, 60).ToString(),
             [SettingKeys.HistoryDays] = Math.Clamp(historyDays, 7, 180).ToString(),
+            [SettingKeys.StartupInventoryMode] = startupMode ? "true" : "false",
+            [SettingKeys.DefaultOwnerId] = defaultOwnerId?.ToString() ?? "",
         }), "Configuración guardada.", redirecting: true);
         return RedirectToPage();
     }

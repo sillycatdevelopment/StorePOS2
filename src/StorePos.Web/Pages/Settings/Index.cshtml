@@ -16,6 +16,16 @@
         </select>
     </label>
     <p class="muted small">Dentro de cada dueño siempre se vende primero el lote más antiguo (FIFO), así el costo y la ganancia de cada dueño son exactos. En modo manual el cajero elige el dueño en el punto de venta.</p>
+    <h2>Empezar con la mercancía que ya tienes</h2>
+    <label class="check"><input type="checkbox" name="startupMode" value="true" checked="@(v[StorePos.Core.Services.SettingKeys.StartupInventoryMode] == "true")" /> Modo <strong>inventario inicial</strong></label>
+    <input type="hidden" name="startupMode" value="false" />
+    <p class="muted small">Mientras esté activo: (1) si un producto no tiene existencia registrada, se puede vender igual y esas piezas se registran como inventario inicial del dueño indicado, a su precio de compra; (2) los cajeros pueden dar de alta productos al escanear un código desconocido. Desactívalo cuando termines de capturar tu inventario, para que el sistema vuelva a avisar cuando algo se agote.</p>
+    <label>Dueño por defecto de la mercancía existente
+        <select name="defaultOwnerId">
+            <option value="">— ninguno —</option>
+            @foreach (var o in Model.Owners) { <option value="@o.Id" selected="@(v[StorePos.Core.Services.SettingKeys.DefaultOwnerId] == o.Id.ToString())">@o.Name</option> }
+        </select>
+    </label>
     <h2>Existencias y surtido</h2>
     <div class="form-grid">
         <label>“Cerca del mínimo” = hasta este % arriba del mínimo <input name="lowStockMargin" type="number" min="0" max="500" value="@v[StorePos.Core.Services.SettingKeys.LowStockMarginPercent]" /></label>

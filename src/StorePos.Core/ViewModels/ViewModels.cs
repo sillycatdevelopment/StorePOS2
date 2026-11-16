@@ -137,6 +137,21 @@ public class SaleRequest
     public bool AuthorizeNoStock { get; set; }
 }
 
+/// <summary>Quick product registration from the POS. Quantities in base units (pieces or grams).</summary>
+public class QuickProductRequest
+{
+    public string Name { get; set; } = "";
+    public string? Barcode { get; set; }
+    public int? CategoryId { get; set; }
+    public UnitType Unit { get; set; }
+    public long SalePriceCents { get; set; }
+    public long PurchasePriceCents { get; set; }
+    public long MinStock { get; set; }
+    public int? OwnerId { get; set; }
+    /// <summary>Units on the shelf right now, including the ones being sold (0 = unknown).</summary>
+    public long ShelfQty { get; set; }
+}
+
 public class SaleFilter
 {
     public DateOnly? From { get; set; }

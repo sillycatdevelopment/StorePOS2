@@ -532,3 +532,74 @@ public class DeletionTests
         Assert.Null((await h.Db.Products.FindAsync(p))!.CategoryId);
     }
 }
+
+public class StartupInventoryTests
+{
+    private static Task EnableStartupAsync(TestHost h, int? defaultOwner = null) =>
+        h.Get<SettingsService>().SetManyAsync(new Dictionary<string, string>
+        {
+            [SettingKeys.StartupInventoryMode] = "true",
+            [SettingKeys.DefaultOwnerId] = defaultOwner?.ToString() ?? ""
+        });
+
+    [Fact]
+    public async Task Startup_mode_sells_untracked_stock_and_records_it_as_initial_inventory()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("A"); await h.OwnerAsync("B");
+        int p = await h.ProductAsync("Coca 600", 18m, 12m);
+        await EnableStartupAsync(h, a);
+        await h.OpenCashAsync();
+        h.User.Role = UserRole.Cashier;
+
+        int id = await h.Get<SalesService>().CompleteSaleAsync(new SaleRequest
+        {
+            PaymentMethodId = h.MethodId("Efectivo"), Lines = { new SaleLineRequest { ProductId = p, Quantity = 2 } }
+        });
+        h.NewScope();
+        var item = (await h.Get<SalesService>().GetSaleAsync(id))!.Items.Single();
+        Assert.Equal(a, item.OwnerId);
+        Assert.Equal(2400, item.CostCents);
+        Assert.Equal(0, await h.Get<InventoryService>().GetStockAsync(p));
+        Assert.Equal(1, await h.Db.InventoryMovements.CountAsync(m => m.Type == MovementType.InitialStock && m.Quantity == 2));
+    }
+
+    [Fact]
+    public async Task Without_startup_mode_a_cashier_cannot_sell_untracked_stock_or_register_products()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("A");
+        int p = await h.ProductAsync("Pan", 10m);
+        await h.OpenCashAsync();
+        h.User.Role = UserRole.Cashier;
+        await Assert.ThrowsAsync<DomainException>(() => h.Get<SalesService>().CompleteSaleAsync(new SaleRequest
+        {
+            PaymentMethodId = h.MethodId("Efectivo"), Lines = { new SaleLineRequest { ProductId = p, Quantity = 1, OwnerId = a } }
+        }));
+        await Assert.ThrowsAsync<DomainException>(() => h.Get<SalesService>().QuickRegisterAsync(new QuickProductRequest
+        {
+            Name = "Nuevo", Barcode = "999", SalePriceCents = 1000
+        }));
+    }
+
+    [Fact]
+    public async Task Quick_register_creates_the_product_with_shelf_stock()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("A");
+        await EnableStartupAsync(h, a);
+        h.User.Role = UserRole.Cashier;
+        var pos = await h.Get<SalesService>().QuickRegisterAsync(new QuickProductRequest
+        {
+            Name = "Sabritas 45 g", Barcode = "7501011115678", SalePriceCents = 2000, PurchasePriceCents = 1400, ShelfQty = 12
+        });
+        h.NewScope();
+        Assert.Equal(12, await h.Get<InventoryService>().GetStockAsync(pos.Id, a));
+        Assert.Equal(a, (await h.Db.Products.FindAsync(pos.Id))!.PriorityOwnerId);
+        Assert.NotNull(await h.Get<SalesService>().LookupBarcodeAsync("7501011115678"));
+        await Assert.ThrowsAsync<DomainException>(() => h.Get<SalesService>().QuickRegisterAsync(new QuickProductRequest
+        {
+            Name = "Duplicado", Barcode = "7501011115678", SalePriceCents = 100
+        }));
+    }
+}

@@ -29,6 +29,8 @@ public static class SettingKeys
     public const string BackupIntervalHours = "Backup.IntervalHours";
     public const string BackupKeepCount = "Backup.KeepCount";
     public const string BackupLastAutoAt = "Backup.LastAutoAt";
+    public const string StartupInventoryMode = "Inventory.StartupMode";
+    public const string DefaultOwnerId = "Inventory.DefaultOwnerId";
 }
 
 public class SettingsService(StoreDbContext db, SettingsCache cache, AuditService audit)
@@ -47,6 +49,8 @@ public class SettingsService(StoreDbContext db, SettingsCache cache, AuditServic
         [SettingKeys.BackupIntervalHours] = "24",
         [SettingKeys.BackupKeepCount] = "30",
         [SettingKeys.BackupLastAutoAt] = "",
+        [SettingKeys.StartupInventoryMode] = "false",
+        [SettingKeys.DefaultOwnerId] = "",
     };
 
     private async Task EnsureLoadedAsync()

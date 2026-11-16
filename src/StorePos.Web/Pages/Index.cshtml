@@ -8,6 +8,10 @@
     <a class="btn" href="/Requests">+ Producto solicitado</a>
 </div>
 
+@if (Model.StartupMode)
+{
+    <div class="alert warn">Modo <strong>inventario inicial</strong> activo: las ventas sin existencia registran la mercancía automáticamente. Desactívalo en <a href="/Settings">Configuración</a> cuando termines de capturar tu inventario.</div>
+}
 @if (Model.OpenDay is null)
 {
     <div class="alert warn">La caja está <strong>cerrada</strong>. <a href="/Cash">Abrir caja</a> para empezar a vender.</div>

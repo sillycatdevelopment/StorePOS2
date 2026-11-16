@@ -6,7 +6,7 @@ using StorePos.Core.ViewModels;
 
 namespace StorePos.Core.Services;
 
-public class SalesService(StoreDbContext db, InventoryService inventory, CashService cash, SettingsService settings,
+public class SalesService(StoreDbContext db, InventoryService inventory, ProductService products, CashService cash, SettingsService settings,
                           AuditService audit, ICurrentUser user, IClock clock, WriteGate gate)
 {
     // ------------------------------------------------------------------ POS lookups
@@ -77,6 +77,8 @@ public class SalesService(StoreDbContext db, InventoryService inventory, CashSer
         var products = await db.Products.Include(p => p.Category).Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
         var ownerNames = await db.Owners.ToDictionaryAsync(o => o.Id, o => o.Name);
         var mode = await settings.GetAllocationModeAsync();
+        var policy = new ShortagePolicy(req.AuthorizeNoStock, await settings.GetBoolAsync(SettingKeys.StartupInventoryMode),
+                                        await GetDefaultOwnerIdAsync());
         var now = clock.Now;
         var today = DateOnly.FromDateTime(now);
 
@@ -99,7 +101,7 @@ public class SalesService(StoreDbContext db, InventoryService inventory, CashSer
             if (!products.TryGetValue(line.ProductId, out var product) || !product.IsActive)
                 throw new DomainException("Uno de los productos no existe o está inactivo.");
 
-            var split = await AllocateAsync(product, line.Quantity, line.OwnerId, mode, req.AuthorizeNoStock);
+            var split = await AllocateAsync(product, line.Quantity, line.OwnerId, mode, policy);
             var shares = SplitProportional(line.DiscountCents, split.Select(s => s.Qty).ToList());
 
             for (int i = 0; i < split.Count; i++)
@@ -176,7 +178,7 @@ public class SalesService(StoreDbContext db, InventoryService inventory, CashSer
 
     /// <summary>Decides which owner(s) the quantity comes from. Never mixes owners silently in Manual mode.</summary>
     private async Task<List<(int OwnerId, long Qty)>> AllocateAsync(Product product, long qty, int? requestedOwner,
-                                                                    AllocationMode mode, bool authorizeNoStock)
+                                                                    AllocationMode mode, ShortagePolicy policy)
     {
         var stock = await db.InventoryLots
             .Where(l => l.ProductId == product.Id && l.QtyRemaining > 0)
@@ -202,7 +204,7 @@ public class SalesService(StoreDbContext db, InventoryService inventory, CashSer
             var s = stock.FirstOrDefault(x => x.OwnerId == chosen);
             long take = Math.Min(remaining, s?.Qty ?? 0);
             if (take > 0) { result.Add((chosen, take)); remaining -= take; }
-            if (remaining > 0) await CoverShortageAsync(product, chosen, remaining, authorizeNoStock, result);
+            if (remaining > 0) await CoverShortageAsync(product, chosen, remaining, policy, result);
             return result;
         }
 
@@ -233,7 +235,7 @@ public class SalesService(StoreDbContext db, InventoryService inventory, CashSer
 
         if (remaining > 0)
         {
-            int? shortageOwner = result.Count > 0 ? result[^1].Item1 : product.PriorityOwnerId;
+            int? shortageOwner = result.Count > 0 ? result[^1].Item1 : product.PriorityOwnerId ?? policy.DefaultOwnerId;
             if (shortageOwner is null)
             {
                 var active = await db.Owners.Where(o => o.IsActive).Select(o => o.Id).Take(2).ToListAsync();
@@ -241,28 +243,83 @@ public class SalesService(StoreDbContext db, InventoryService inventory, CashSer
             }
             if (shortageOwner is null)
             {
-                if (!authorizeNoStock) throw new DomainException($"No hay existencia de \"{product.Name}\".");
+                if (!policy.Authorized && !policy.Startup) throw new DomainException($"No hay existencia de \"{product.Name}\".");
                 throw new DomainException($"Selecciona a qué dueño se le atribuye la venta sin existencia de \"{product.Name}\".");
             }
-            await CoverShortageAsync(product, shortageOwner.Value, remaining, authorizeNoStock, result);
+            await CoverShortageAsync(product, shortageOwner.Value, remaining, policy, result);
         }
         return result;
     }
 
-    private Task CoverShortageAsync(Product product, int ownerId, long shortage, bool authorized, List<(int, long)> result)
+    /// <summary>What to do when there is not enough recorded stock.</summary>
+    private sealed record ShortagePolicy(bool Authorized, bool Startup, int? DefaultOwnerId);
+
+    private async Task<int?> GetDefaultOwnerIdAsync()
     {
-        if (!authorized)
+        if (!int.TryParse(await settings.GetAsync(SettingKeys.DefaultOwnerId), out var id)) return null;
+        return await db.Owners.AnyAsync(o => o.Id == id && o.IsActive) ? id : null;
+    }
+
+    private Task CoverShortageAsync(Product product, int ownerId, long shortage, ShortagePolicy policy, List<(int, long)> result)
+    {
+        if (policy.Startup)
+        {
+            // Start-up mode: the merchandise is physically on the shelf but was never counted.
+            // Record it as initial stock (at the product's reference cost) and sell it normally.
+            inventory.AddStockCore(product.Id, ownerId, shortage, product.PurchasePriceCents, MovementType.InitialStock,
+                                   "Existencia registrada al vender (inventario inicial)");
+            audit.Add("Inventario inicial registrado al vender", "Product", product.Id,
+                      $"{Qty.Format(shortage, product.Unit)} de {product.Name} a {Money.Format(product.PurchasePriceCents)} c/u");
+        }
+        else if (policy.Authorized)
+        {
+            // Keep lots non-negative: register the missing units as an audited correction, then sell them normally.
+            inventory.AddStockCore(product.Id, ownerId, shortage, product.PurchasePriceCents, MovementType.Correction,
+                                   "Venta autorizada sin existencia");
+            audit.Add("Venta sin existencia autorizada", "Product", product.Id,
+                      $"{Qty.Format(shortage, product.Unit)} de {product.Name} registrados a {Money.Format(product.PurchasePriceCents)} c/u");
+        }
+        else
+        {
             throw new DomainException($"Inventario insuficiente de \"{product.Name}\": faltan {Qty.Format(shortage, product.Unit)}. " +
                                       "Un encargado puede autorizar la venta sin existencia.");
-        // Keep lots non-negative: register the missing units as an audited correction, then sell them normally.
-        inventory.AddStockCore(product.Id, ownerId, shortage, product.PurchasePriceCents, MovementType.Correction,
-                               "Venta autorizada sin existencia");
-        audit.Add("Venta sin existencia autorizada", "Product", product.Id,
-                  $"{Qty.Format(shortage, product.Unit)} de {product.Name} registrados a {Money.Format(product.PurchasePriceCents)} c/u");
+        }
         int idx = result.FindIndex(r => r.Item1 == ownerId);
         if (idx >= 0) result[idx] = (ownerId, result[idx].Item2 + shortage);
         else result.Add((ownerId, shortage));
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Registers a product straight from the POS (unknown barcode) and, optionally, how many are on the shelf.
+    /// Managers can always do it; cashiers only while the start-up inventory mode is on.
+    /// </summary>
+    public async Task<PosProduct> QuickRegisterAsync(QuickProductRequest req)
+    {
+        bool startup = await settings.GetBoolAsync(SettingKeys.StartupInventoryMode);
+        if (!user.Role.AtLeast(UserRole.Manager) && !startup)
+            throw new DomainException("Solo un encargado puede dar de alta productos (o activa el modo de inventario inicial).");
+        if (req.SalePriceCents <= 0) throw new DomainException("Escribe el precio de venta.");
+        if (req.ShelfQty < 0) throw new DomainException("La existencia no puede ser negativa.");
+
+        int? ownerId = req.OwnerId ?? await GetDefaultOwnerIdAsync();
+        if (req.ShelfQty > 0 && ownerId is null)
+            throw new DomainException("Indica de qué dueño es la mercancía.");
+
+        int id = await products.SaveAsync(new ProductInput
+        {
+            Name = req.Name, Barcode = req.Barcode, CategoryId = req.CategoryId, Unit = req.Unit,
+            SalePriceCents = req.SalePriceCents, PurchasePriceCents = Math.Max(0, req.PurchasePriceCents),
+            MinStock = Math.Max(0, req.MinStock), PriorityOwnerId = ownerId, IsActive = true
+        });
+        if (req.ShelfQty > 0)
+            await inventory.AddStockAsync(id, ownerId!.Value, req.ShelfQty, Math.Max(0, req.PurchasePriceCents),
+                                          MovementType.InitialStock, "Existencia inicial registrada desde el punto de venta");
+        audit.Add("Producto registrado desde el punto de venta", "Product", id, $"{req.Name} ({req.Barcode})");
+        await db.SaveChangesAsync();
+
+        var p = await db.Products.AsNoTracking().FirstAsync(x => x.Id == id);
+        return (await ToPosAsync(new[] { p })).Single();
     }
 
     /// <summary>Splits an amount over weights, distributing rounding remainders so the parts add up exactly.</summary>
