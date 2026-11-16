@@ -18,6 +18,9 @@
                     <label class="check"><input type="checkbox" name="isActive" value="true" checked="@u.IsActive" /> Activo</label><input type="hidden" name="isActive" value="false" />
                     <input name="newPassword" type="password" placeholder="Nueva contraseña (opcional)" autocomplete="new-password" />
                     <button class="btn small">Guardar</button>
+                </form>
+                <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" style="margin-top:4px" data-confirm="¿Eliminar el usuario @u.Username?">
+                    <button class="btn small danger">Eliminar</button>
                 </form></td><td>@F.DT(u.LastLoginAt)</td></tr>
         }
         </tbody>

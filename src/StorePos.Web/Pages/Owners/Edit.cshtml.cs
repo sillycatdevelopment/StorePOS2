@@ -6,7 +6,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Owners;
 
 [Authorize(Policy = Policies.Manager)]
-public class EditModel(OwnerService owners) : AppPageModel
+public class EditModel(OwnerService owners, DeletionService deletion) : AppPageModel
 {
     [BindProperty] public int? Id { get; set; }
     [BindProperty] public string Name { get; set; } = "";
@@ -30,5 +30,12 @@ public class EditModel(OwnerService owners) : AppPageModel
         if (await TryAsync(() => owners.SaveAsync(Id, Name, Contact, Notes, IsActive), "Dueño guardado."))
             return RedirectToPage("/Owners/Index");
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        if (await TryAsync(() => deletion.DeleteOwnerAsync(id), "Dueño eliminado.", redirecting: true))
+            return RedirectToPage("/Owners/Index");
+        return RedirectToPage(new { id });
     }
 }

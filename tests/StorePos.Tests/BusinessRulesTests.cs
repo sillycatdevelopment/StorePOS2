@@ -487,3 +487,48 @@ public class InventoryAndPurchasingTests
         Assert.True(idx[11] > 1.2);  // December sells more
     }
 }
+
+public class DeletionTests
+{
+    [Fact]
+    public async Task Unused_catalog_records_can_be_deleted()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("A");
+        int s = await h.Get<SupplierService>().SaveAsync(null, "Bimbo", null, null, null, true, new[] { DayOfWeek.Monday });
+        int p = await h.ProductAsync("Prueba", 10m, supplierId: s, priorityOwner: a);
+        var del = h.Get<DeletionService>();
+        await del.DeleteProductAsync(p);
+        await del.DeleteOwnerAsync(a);
+        await del.DeleteSupplierAsync(s);
+        h.NewScope();
+        Assert.False(await h.Db.Products.AnyAsync());
+        Assert.False(await h.Db.Owners.AnyAsync());
+        Assert.False(await h.Db.SupplierSchedules.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Records_with_sales_or_stock_cannot_be_deleted()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("A");
+        int p = await h.ProductAsync("Con historial", 10m);
+        await h.StockAsync(p, a, 5, 6m);
+        var del = h.Get<DeletionService>();
+        await Assert.ThrowsAsync<DomainException>(() => del.DeleteProductAsync(p));
+        await Assert.ThrowsAsync<DomainException>(() => del.DeleteOwnerAsync(a));
+        h.NewScope();
+        Assert.Equal(5, await h.Get<InventoryService>().GetStockAsync(p));
+    }
+
+    [Fact]
+    public async Task Deleting_a_category_leaves_products_without_category()
+    {
+        await using var h = await TestHost.CreateAsync();
+        var cat = await h.Db.Categories.FirstAsync();
+        int p = await h.Get<ProductService>().SaveAsync(new ProductInput { Name = "X", SalePriceCents = 100, CategoryId = cat.Id });
+        await h.Get<DeletionService>().DeleteCategoryAsync(cat.Id);
+        h.NewScope();
+        Assert.Null((await h.Db.Products.FindAsync(p))!.CategoryId);
+    }
+}

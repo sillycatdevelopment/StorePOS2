@@ -9,7 +9,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Products;
 
 [Authorize(Policy = Policies.Manager)]
-public class EditModel(ProductService products, OwnerService owners, SupplierService suppliers, InventoryService inventory) : AppPageModel
+public class EditModel(ProductService products, OwnerService owners, SupplierService suppliers, InventoryService inventory, DeletionService deletion) : AppPageModel
 {
     public class Form
     {
@@ -94,5 +94,12 @@ public class EditModel(ProductService products, OwnerService owners, SupplierSer
         if (ok) return next == "new" ? RedirectToPage("/Products/Edit") : RedirectToPage("/Products/Index");
         await LoadListsAsync();
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        if (await TryAsync(() => deletion.DeleteProductAsync(id), "Producto eliminado.", redirecting: true))
+            return RedirectToPage("/Products/Index");
+        return RedirectToPage(new { id });
     }
 }

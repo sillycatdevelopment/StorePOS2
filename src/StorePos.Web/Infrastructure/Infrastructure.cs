@@ -55,6 +55,9 @@ public class FirstRunMiddleware(RequestDelegate next)
 {
     private static volatile bool _hasUsers;
 
+    /// <summary>Called after a full data reset so the next request goes to /Setup again.</summary>
+    public static void Reset() => _hasUsers = false;
+
     public async Task InvokeAsync(HttpContext ctx, UserService users)
     {
         if (!_hasUsers)

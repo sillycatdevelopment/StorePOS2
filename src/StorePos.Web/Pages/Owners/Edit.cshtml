@@ -11,3 +11,11 @@
     <p class="muted small">Un dueño inactivo conserva su historial y su existencia actual se puede seguir vendiendo.</p>
     <div class="actions"><button class="btn primary">Guardar</button><a class="btn" href="/Owners">Cancelar</a></div>
 </form>
+@if (Model.Id is int oid)
+{
+    <form method="post" asp-page-handler="Delete" asp-route-id="@oid" class="card narrow" data-confirm="¿Eliminar este dueño? No se puede deshacer.">
+        <h2>Eliminar dueño</h2>
+        <p class="muted small">Solo si nunca tuvo mercancía ni ventas. Si ya tiene historial, desactívalo.</p>
+        <button class="btn danger">Eliminar</button>
+    </form>
+}

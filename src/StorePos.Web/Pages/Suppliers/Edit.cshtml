@@ -23,3 +23,11 @@
     <label class="check"><input type="checkbox" asp-for="IsActive" /> Activo</label>
     <div class="actions"><button class="btn primary">Guardar</button><a class="btn" href="/Suppliers">Cancelar</a></div>
 </form>
+@if (Model.Id is int sid)
+{
+    <form method="post" asp-page-handler="Delete" asp-route-id="@sid" class="card narrow" data-confirm="¿Eliminar este proveedor? No se puede deshacer.">
+        <h2>Eliminar proveedor</h2>
+        <p class="muted small">Solo si no tiene entregas registradas. Sus productos quedan sin proveedor habitual.</p>
+        <button class="btn danger">Eliminar</button>
+    </form>
+}

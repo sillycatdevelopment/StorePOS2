@@ -63,7 +63,7 @@ Settings in `appsettings.json`: `StorePos:DatabasePath`, `StorePos:Urls` (defaul
 | 6 | Suppliers with weekday schedules, upcoming deliveries, delivery registration (supplier + owner + cost), stocking lists (auto/manual, grouped, edit, purchased, received → inventory) |
 | 7 | Reports by day/week/month/year, owner, category, supplier, payment method; best/worst sellers; trends, weekday profile, seasonality (12-month minimum), recommendations; customer requests with aggregation |
 | 8 | 9 Excel exports with filters; online SQLite backups, automatic backups, restore with validation + safety backup; roles; audit log |
-| 9 | 27 xUnit tests on a real in-memory SQLite database (see below) |
+| 9 | 30 xUnit tests on a real in-memory SQLite database (see below) |
 
 ## Tests (`tests/StorePos.Tests`)
 
@@ -74,6 +74,15 @@ the same lots, kilogram sales, expected cash (card excluded), closing difference
 refunds for sales from closed days, movement journal integrity, transfers, deliveries, request
 aggregation, the documented reorder formula (stock 5, 4/day, next delivery 3 days → 33), stocking
 lists not touching inventory until received, and seasonality thresholds.
+
+## Deleting test data
+
+*Configuración → Borrar datos* (administrators) offers two resets, each preceded by an automatic backup:
+**Borrar operaciones** clears sales, cash closings, stock, deliveries, lists, requests and the audit log
+but keeps the catalog, owners, suppliers and users; **Borrar todo** returns to a fresh install.
+Single records (products, owners, suppliers, categories, users, payment methods, stocking lists,
+customer requests) have an *Eliminar* button; records that already have sales or stock must be
+deactivated instead, so totals never break.
 
 ## Known limitations / next steps
 

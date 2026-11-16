@@ -36,6 +36,7 @@ public static class ServiceRegistration
         services.AddScoped<ExcelExportService>();
         services.AddScoped<UserService>();
         services.AddScoped<BackupService>();
+        services.AddScoped<DeletionService>();
         return services;
     }
 }

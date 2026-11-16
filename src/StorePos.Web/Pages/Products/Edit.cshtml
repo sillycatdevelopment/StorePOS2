@@ -60,3 +60,11 @@
         <a class="btn" href="/Products">Cancelar</a>
     </div>
 </form>
+@if (!Model.IsNew)
+{
+    <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Input.Id" class="card narrow" data-confirm="¿Eliminar este producto? No se puede deshacer.">
+        <h2>Eliminar producto</h2>
+        <p class="muted small">Solo se puede eliminar si nunca tuvo inventario, ventas ni entregas. Si ya tiene historial, desactívalo (quita la casilla “Activo”).</p>
+        <button class="btn danger">Eliminar</button>
+    </form>
+}

@@ -22,6 +22,9 @@
                     <input type="hidden" name="isActive" value="false" />
                     <button class="btn small">Guardar</button>
                 </form>
+                <form method="post" asp-page-handler="Delete" asp-route-id="@c.Id" style="display:inline" data-confirm="¿Eliminar la categoría @c.Name? Sus productos quedarán sin categoría.">
+                    <button class="btn small danger">Eliminar</button>
+                </form>
             </td>
         </tr>
     }

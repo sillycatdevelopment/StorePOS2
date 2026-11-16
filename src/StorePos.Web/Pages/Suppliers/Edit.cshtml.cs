@@ -6,7 +6,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Suppliers;
 
 [Authorize(Policy = Policies.Manager)]
-public class EditModel(SupplierService suppliers) : AppPageModel
+public class EditModel(SupplierService suppliers, DeletionService deletion) : AppPageModel
 {
     [BindProperty] public int? Id { get; set; }
     [BindProperty] public string Name { get; set; } = "";
@@ -33,5 +33,12 @@ public class EditModel(SupplierService suppliers) : AppPageModel
         if (await TryAsync(() => suppliers.SaveAsync(Id, Name, Contact, Phone, Notes, IsActive, Days), "Proveedor guardado."))
             return RedirectToPage("/Suppliers/Index");
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        if (await TryAsync(() => deletion.DeleteSupplierAsync(id), "Proveedor eliminado.", redirecting: true))
+            return RedirectToPage("/Suppliers/Index");
+        return RedirectToPage(new { id });
     }
 }

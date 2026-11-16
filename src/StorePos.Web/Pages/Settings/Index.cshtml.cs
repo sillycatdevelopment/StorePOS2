@@ -7,7 +7,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Settings;
 
 [Authorize(Policy = Policies.Admin)]
-public class IndexModel(SettingsService settings, SalesService sales) : AppPageModel
+public class IndexModel(SettingsService settings, SalesService sales, DeletionService deletion) : AppPageModel
 {
     public Dictionary<string, string> Values { get; private set; } = new();
     public List<PaymentMethod> Methods { get; private set; } = new();
@@ -37,6 +37,12 @@ public class IndexModel(SettingsService settings, SalesService sales) : AppPageM
     public async Task<IActionResult> OnPostMethodAsync(int? id, string name, bool isCash, bool isActive, int sortOrder)
     {
         await TryAsync(() => sales.SavePaymentMethodAsync(id, name, isCash, isActive, sortOrder), "Forma de pago guardada.", redirecting: true);
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostDeleteMethodAsync(int id)
+    {
+        await TryAsync(() => deletion.DeletePaymentMethodAsync(id), "Forma de pago eliminada.", redirecting: true);
         return RedirectToPage();
     }
 }

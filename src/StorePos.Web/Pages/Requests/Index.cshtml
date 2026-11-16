@@ -45,6 +45,9 @@
                         <select name="newStatus">@foreach (var s in Enum.GetValues<RequestStatus>()) { <option value="@s" selected="@(r.Status == s)">@DisplayNames.Of(s)</option> }</select>
                         <button class="btn small">Cambiar</button>
                     </form>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@r.Id" data-confirm="¿Eliminar la solicitud de @r.ProductName?">
+                        <button class="btn small danger">Eliminar</button>
+                    </form>
                 </td>
             }
         </tr>

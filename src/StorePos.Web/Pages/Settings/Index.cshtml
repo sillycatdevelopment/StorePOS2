@@ -42,6 +42,9 @@
                     <input name="sortOrder" type="number" value="@m.SortOrder" style="width:70px;min-width:0" />
                     <button class="btn small">Guardar</button>
                 </form>
+                <form method="post" asp-page-handler="DeleteMethod" asp-route-id="@m.Id" style="display:inline" data-confirm="¿Eliminar la forma de pago @m.Name?">
+                    <button class="btn small danger">Eliminar</button>
+                </form>
             </td></tr>
         }
         <tr><td colspan="5">

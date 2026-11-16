@@ -1,0 +1,28 @@
+@page
+@model StorePos.Web.Pages.Settings.ResetModel
+@{ ViewData["Title"] = "Borrar datos"; }
+<h1>Borrar datos de prueba</h1>
+<partial name="_Nav" />
+<div class="alert warn">Antes de borrar se crea automáticamente un respaldo (archivo <code>storepos_…_antes_de_borrar.db</code> en <a href="/Settings/Backups">Respaldos</a>). Si te equivocas, puedes restaurarlo desde ahí.</div>
+<div class="grid c2">
+    <form method="post" asp-page-handler="Operations" class="card" data-confirm="¿Borrar todas las ventas, el inventario y los cortes de caja?">
+        <h2>Borrar operaciones (conservar catálogo)</h2>
+        <p>Borra <strong>ventas, cortes de caja, movimientos de caja, existencias e historial de inventario, entregas, listas de surtido, solicitudes de clientes y la bitácora</strong>.</p>
+        <p>Conserva <strong>productos, precios, categorías, dueños, proveedores, usuarios y configuración</strong>. Todos los productos quedan con existencia 0 y los folios vuelven a empezar en 1.</p>
+        <p class="muted small">Úsalo cuando termines de hacer pruebas y vayas a empezar a usar el sistema de verdad.</p>
+        <label>Escribe <strong>BORRAR</strong> para confirmar <input name="confirm" autocomplete="off" required /></label>
+        <button class="btn danger">Borrar operaciones</button>
+    </form>
+    <form method="post" asp-page-handler="Everything" class="card" data-confirm="¿Borrar ABSOLUTAMENTE TODO, incluidos los usuarios?">
+        <h2>Borrar todo (empezar de cero)</h2>
+        <p>Borra <strong>todo</strong>, incluidos productos, dueños, proveedores, categorías, <strong>usuarios</strong> y configuración. El sistema queda como recién instalado.</p>
+        <p>Al terminar se cierra tu sesión y se pide crear el administrador de nuevo.</p>
+        <label>Escribe <strong>BORRAR</strong> para confirmar <input name="confirm" autocomplete="off" required /></label>
+        <button class="btn danger">Borrar todo</button>
+    </form>
+</div>
+<div class="card">
+    <h2>Eliminar registros sueltos</h2>
+    <p class="small">Productos, dueños, proveedores, categorías, usuarios, formas de pago, listas de surtido y solicitudes tienen un botón <strong>Eliminar</strong> en su propia pantalla. Un producto, dueño, proveedor o usuario que ya tiene ventas o inventario no se puede eliminar solo (se romperían los totales): desactívalo, o usa una de las opciones de arriba.</p>
+    <p class="small">Las ventas sueltas se <strong>cancelan</strong> (Historial de ventas → Ver → Cancelar) y los cortes de caja solo se borran con “Borrar operaciones”.</p>
+</div>

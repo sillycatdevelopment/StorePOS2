@@ -7,7 +7,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Settings;
 
 [Authorize(Policy = Policies.Admin)]
-public class UsersModel(UserService users) : AppPageModel
+public class UsersModel(UserService users, DeletionService deletion) : AppPageModel
 {
     public List<User> Users { get; private set; } = new();
 
@@ -22,6 +22,12 @@ public class UsersModel(UserService users) : AppPageModel
     public async Task<IActionResult> OnPostUpdateAsync(int id, string displayName, UserRole role, bool isActive, string? newPassword)
     {
         await TryAsync(() => users.UpdateAsync(id, displayName, role, isActive, newPassword), "Usuario actualizado.", redirecting: true);
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        await TryAsync(() => deletion.DeleteUserAsync(id), "Usuario eliminado.", redirecting: true);
         return RedirectToPage();
     }
 }

@@ -7,7 +7,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Requests;
 
 /// <summary>Very quick capture of products customers ask for but the store doesn't have.</summary>
-public class IndexModel(CustomerRequestService requests, ProductService products) : AppPageModel
+public class IndexModel(CustomerRequestService requests, ProductService products, DeletionService deletion) : AppPageModel
 {
     [BindProperty(SupportsGet = true)] public RequestStatus? Status { get; set; } = RequestStatus.Pending;
     [BindProperty(SupportsGet = true)] public string? Q { get; set; }
@@ -34,6 +34,12 @@ public class IndexModel(CustomerRequestService requests, ProductService products
     {
         if (!IsManager) return Forbid();
         await TryAsync(() => requests.SetStatusAsync(id, newStatus), "Estado actualizado.", redirecting: true);
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        await TryAsync(() => deletion.DeleteCustomerRequestAsync(id), "Solicitud eliminada.", redirecting: true);
         return RedirectToPage();
     }
 }

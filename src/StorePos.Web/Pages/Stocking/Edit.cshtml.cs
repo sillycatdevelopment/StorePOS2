@@ -9,7 +9,7 @@ using StorePos.Web.Infrastructure;
 namespace StorePos.Web.Pages.Stocking;
 
 [Authorize(Policy = Policies.Manager)]
-public class EditModel(StockingService stocking, SupplierService suppliers, OwnerService owners, ProductService products) : AppPageModel
+public class EditModel(StockingService stocking, SupplierService suppliers, OwnerService owners, ProductService products, DeletionService deletion) : AppPageModel
 {
     public class Row
     {
@@ -76,6 +76,13 @@ public class EditModel(StockingService stocking, SupplierService suppliers, Owne
     {
         await TryAsync(() => stocking.SetStatusAsync(Id, status),
             status == StockingListStatus.Purchased ? "Lista marcada como comprada." : "Lista cancelada.", redirecting: true);
+        return RedirectToPage(new { Id });
+    }
+
+    public async Task<IActionResult> OnPostDeleteAsync()
+    {
+        if (await TryAsync(() => deletion.DeleteStockingListAsync(Id), "Lista eliminada.", redirecting: true))
+            return RedirectToPage("/Stocking/Index");
         return RedirectToPage(new { Id });
     }
 }
