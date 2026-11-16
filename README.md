@@ -10,7 +10,7 @@
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
 
-[**Descargar**](https://github.com/sillycatdevelopment/StorePOS2/releases/latest) · [Instalación](#-instalación) · [Funciones](#-funciones) · [Para desarrolladores](docs/DEVELOPMENT.md)
+[**Descargar**](https://github.com/sillycatdevelopment/StorePOS2/releases/latest) · [Instalación](#-instalación) · [**Guía de uso**](docs/GUIA-DE-USO.md) · [Funciones](#-funciones) · [Para desarrolladores](docs/DEVELOPMENT.md)
 
 </div>
 
@@ -71,6 +71,8 @@ En el otro dispositivo, conectado al mismo Wi‑Fi, abre `http://192.168.1.20:50
 2. **Inventario** o **Proveedores → Registrar entrega** → indica cuánto hay y de qué dueño es.
 3. **Caja y corte** → abre la caja con el fondo inicial.
 4. **Punto de venta** → ¡a vender! Al final del día haz el **corte de caja**.
+
+Paso a paso, con imágenes: **[Guía de uso](docs/GUIA-DE-USO.md)**.
 
 ## 🔄 Actualizaciones
 
