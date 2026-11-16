@@ -156,10 +156,19 @@
     add(found[+b.dataset.i]); hideResults(); scan.value = '';
   });
 
-  function get(url) { return fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  // If the black StorePOS window is in "Seleccionar" mode the server is paused and requests never finish.
+  var FROZEN = 'El servidor no responde. Revisa la ventana negra de StorePOS: si su título empieza con “Seleccionar”, haz clic en ella y presiona Esc.';
+  function fetchT(url, options, ms) {
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms) : null;
+    options = options || {};
+    if (ctrl) options.signal = ctrl.signal;
+    return fetch(url, options).finally(function () { if (timer) clearTimeout(timer); });
+  }
+  function get(url) { return fetchT(url, { headers: { 'Accept': 'application/json' } }, 8000).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
 
   function search(text) {
-    return get('/Pos?handler=Search&q=' + encodeURIComponent(text)).then(showResults).catch(function () { say('Error al buscar.', 'error'); });
+    return get('/Pos?handler=Search&q=' + encodeURIComponent(text)).then(showResults).catch(function () { say(FROZEN, 'error'); });
   }
 
   function submitScan() {
@@ -176,7 +185,7 @@
         }
         else { showResults(list); say(list.length + ' resultados: usa ↑ ↓ y Enter.'); }
       });
-    }).catch(function () { say('Error de conexión con el servidor.', 'error'); });
+    }).catch(function () { say(FROZEN, 'error'); });
   }
 
   scan.addEventListener('keydown', function (e) {
@@ -229,16 +238,16 @@
       };
       if (unit === 0 && (body.shelfQty !== Math.round(body.shelfQty))) { say('La existencia por pieza debe ser un número entero.', 'error'); return; }
       busy = true;
-      fetch('/Pos?handler=QuickAdd', {
+      fetchT('/Pos?handler=QuickAdd', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
         body: JSON.stringify(body)
-      }).then(function (r) { return r.json(); }).then(function (r) {
+      }, 20000).then(function (r) { return r.json(); }).then(function (r) {
         if (!r.ok) { say(r.error, 'error'); return; }
         quick.hidden = true;
         add(r.product);
         say('Producto registrado y agregado: ' + r.product.name, 'ok');
-      }).catch(function () { say('No se pudo contactar al servidor.', 'error'); })
+      }).catch(function () { say(FROZEN, 'error'); })
         .finally(function () { busy = false; });
     });
   }
@@ -282,11 +291,11 @@
       authorizeNoStock: isManager && $('authorize').checked
     };
     busy = true; $('pay').disabled = true; say('Guardando venta…');
-    fetch('/Pos?handler=Complete', {
+    fetchT('/Pos?handler=Complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
       body: JSON.stringify(body)
-    }).then(function (r) { return r.json(); }).then(function (r) {
+    }, 30000).then(function (r) { return r.json(); }).then(function (r) {
       if (!r.ok) { beep(); say(r.error, 'error'); return; }
       $('lastSale').hidden = false;
       $('lastId').textContent = '#' + r.id;
@@ -298,7 +307,7 @@
       if (isManager) { $('ticketDiscount').value = '0'; $('authorize').checked = false; }
       render(); scan.focus();
     }).catch(function () {
-      say('No se pudo contactar al servidor. Revisa el historial antes de volver a cobrar.', 'error');
+      beep(); say(FROZEN + ' Antes de volver a cobrar, revisa en el Historial de ventas si la venta ya quedó registrada.', 'error');
     }).finally(function () { busy = false; $('pay').disabled = false; });
   }
   $('pay').addEventListener('click', pay);

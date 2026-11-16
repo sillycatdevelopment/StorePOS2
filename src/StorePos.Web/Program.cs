@@ -7,6 +7,9 @@ using StorePos.Core.Services;
 using StorePos.Core.Utilities;
 using StorePos.Web.Infrastructure;
 
+// Turn off the console "selection pause" (QuickEdit) and explain the window to the user.
+WindowsConsole.Prepare();
+
 // Start from the folder that contains wwwroot/appsettings.json (the provided Iniciar-StorePOS.bat does this).
 var builder = WebApplication.CreateBuilder(args);
 
