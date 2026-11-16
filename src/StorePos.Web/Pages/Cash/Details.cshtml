@@ -4,6 +4,7 @@
 <div class="toolbar">
     <h1>Corte #@c.Id — @F.D(c.BusinessDate) @(c.Status == ClosingStatus.Open ? "(abierto)" : "")</h1><span class="spacer"></span>
     <a class="btn" href="#" data-print>Imprimir</a>
+    <a class="btn primary" href="/Cash/Ticket?id=@c.Id" target="_blank">Imprimir en ticket</a>
 </div>
 <p>Abrió @c.OpenedByUser?.DisplayName el @F.DT(c.OpenedAt)@if (c.ClosedAt is not null) { <span> · Cerró @c.ClosedByUser?.DisplayName el @F.DT(c.ClosedAt)</span> }</p>
 @if (c.Notes is not null) { <div class="alert warn">Nota del corte: @c.Notes</div> }

@@ -1,0 +1,40 @@
+@page
+@model StorePos.Web.Pages.Stocking.TicketModel
+@{
+    Layout = "_TicketLayout";
+    var l = Model.List;
+    ViewData["Title"] = "Lista " + l.Name;
+    var items = l.Items.Where(i => i.Quantity > 0).ToList();
+    string GroupOf(StockingListItem i) => l.GroupBy switch
+    {
+        StockingGroupBy.Owner => i.Owner?.Name ?? "Sin dueño",
+        StockingGroupBy.Supplier => i.Supplier?.Name ?? "Sin proveedor",
+        _ => ""
+    };
+    long Amount(StockingListItem i) => i.Product is null ? 0 : Money.LineAmount(i.EstimatedUnitCostCents, i.Quantity, i.Product.Unit);
+    string QtyText(StockingListItem i) => i.Product is null ? i.Quantity + " pza" : F.Q(i.Quantity, i.Product.Unit);
+}
+<h2>@Model.StoreName</h2>
+<div style="text-align:center">LISTA DE SURTIDO<br />@l.Name<br />@F.DT(l.CreatedAt) · @DisplayNames.Of(l.Status)</div>
+<div class="sep"></div>
+@foreach (var g in items.GroupBy(GroupOf).OrderBy(g => g.Key))
+{
+    if (g.Key != "") { <div class="h">@g.Key</div> }
+    <table>
+        @foreach (var i in g.OrderBy(x => x.Description))
+        {
+            <tr><td>@QtyText(i)</td><td>@i.Description</td><td class="r">@(i.Product is null ? "" : F.M(Amount(i)))</td></tr>
+        }
+        @if (l.GroupBy != StockingGroupBy.None)
+        {
+            <tr><td></td><td>Subtotal</td><td class="r">@F.M(g.Sum(Amount))</td></tr>
+        }
+    </table>
+    <div class="sep"></div>
+}
+<table>
+    <tr><td><strong>TOTAL ESTIMADO</strong></td><td class="r"><strong>@F.M(items.Sum(Amount))</strong></td></tr>
+    <tr><td>Productos</td><td class="r">@items.Count</td></tr>
+</table>
+@if (!string.IsNullOrWhiteSpace(l.Notes)) { <div class="sep"></div><div>Notas: @l.Notes</div> }
+@if (items.Count == 0) { <p>La lista no tiene cantidades a comprar.</p> }

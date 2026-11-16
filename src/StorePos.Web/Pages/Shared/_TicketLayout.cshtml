@@ -1,0 +1,20 @@
+@* Narrow layout for 80 mm thermal printers. Pages set Layout = "_TicketLayout". *@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>@@page { margin: 0; } .receipt td.r { text-align: right; white-space: nowrap; } .receipt .h { font-weight: bold; margin-top: 4px; }</style>
+</head>
+<body style="background:#fff">
+<div class="receipt">
+    @RenderBody()
+    <div class="no-print" style="text-align:center;margin-top:12px">
+        <button class="btn" onclick="window.print()">Imprimir</button>
+        <button class="btn" onclick="history.length > 1 ? history.back() : window.close()">Volver</button>
+    </div>
+</div>
+<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 200); });</script>
+</body>
+</html>

@@ -17,7 +17,8 @@ else
 {
     var c = Model.Summary.Closing;
     <p>Caja abierta el <strong>@F.DT(c.OpenedAt)</strong> por @c.OpenedByUser?.DisplayName.
-        <a class="btn primary" href="/Cash/Close?id=@c.Id">Hacer corte y cerrar el día</a></p>
+        <a class="btn primary" href="/Cash/Close?id=@c.Id">Hacer corte y cerrar el día</a>
+        <a class="btn" href="/Cash/Ticket?id=@c.Id" target="_blank">Corte parcial en ticket</a></p>
     <partial name="_Summary" model="Model.Summary" />
     <form method="post" asp-page-handler="Movement" class="card">
         <h2>Registrar movimiento de efectivo</h2>

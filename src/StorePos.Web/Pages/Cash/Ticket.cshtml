@@ -1,0 +1,63 @@
+@page
+@model StorePos.Web.Pages.Cash.TicketModel
+@{
+    Layout = "_TicketLayout";
+    var s = Model.Summary; var c = s.Closing;
+    bool closed = c.Status == ClosingStatus.Closed;
+    ViewData["Title"] = "Corte " + c.Id;
+}
+<h2>@Model.StoreName</h2>
+<div style="text-align:center">@(closed ? "CORTE DE CAJA" : "CORTE PARCIAL (CAJA ABIERTA)") #@c.Id<br />@F.D(c.BusinessDate)</div>
+<div>Abrió: @c.OpenedByUser?.DisplayName @F.DT(c.OpenedAt)</div>
+@if (closed) { <div>Cerró: @c.ClosedByUser?.DisplayName @F.DT(c.ClosedAt)</div> }
+else { <div>Impreso: @F.DT(DateTime.Now)</div> }
+<div class="sep"></div>
+<div class="h">VENTAS</div>
+<table>
+    @foreach (var m in s.ByMethod)
+    {
+        <tr><td>@m.Name (@m.SaleCount)</td><td class="r">@F.M(m.AmountCents)</td></tr>
+    }
+    <tr><td><strong>Total vendido (@s.SaleCount)</strong></td><td class="r"><strong>@F.M(s.TotalSalesCents)</strong></td></tr>
+    @if (s.CancelledCount > 0) { <tr><td>Ventas canceladas</td><td class="r">@s.CancelledCount</td></tr> }
+</table>
+<div class="sep"></div>
+<div class="h">EFECTIVO</div>
+<table>
+    <tr><td>Fondo inicial</td><td class="r">@F.M(c.OpeningCashCents)</td></tr>
+    <tr><td>+ Ventas efectivo</td><td class="r">@F.M(s.CashSalesCents)</td></tr>
+    @if (s.DepositsCents + s.OtherInCents > 0) { <tr><td>+ Depósitos/entradas</td><td class="r">@F.M(s.DepositsCents + s.OtherInCents)</td></tr> }
+    @if (s.WithdrawalsCents + s.OtherOutCents > 0) { <tr><td>- Retiros/salidas</td><td class="r">@F.M(s.WithdrawalsCents + s.OtherOutCents)</td></tr> }
+    @if (s.CashExpensesCents > 0) { <tr><td>- Gastos</td><td class="r">@F.M(s.CashExpensesCents)</td></tr> }
+    @if (s.RefundsCents > 0) { <tr><td>- Reembolsos</td><td class="r">@F.M(s.RefundsCents)</td></tr> }
+    <tr><td><strong>Esperado en caja</strong></td><td class="r"><strong>@F.M(s.ExpectedCashCents)</strong></td></tr>
+    @if (closed)
+    {
+        <tr><td>Contado</td><td class="r">@F.M(c.CountedCashCents)</td></tr>
+        <tr><td><strong>Diferencia</strong></td><td class="r"><strong>@F.M(c.DifferenceCents)</strong></td></tr>
+    }
+</table>
+@if (s.Movements.Count > 0)
+{
+    <div class="sep"></div>
+    <div class="h">MOVIMIENTOS</div>
+    <table>
+        @foreach (var m in s.Movements)
+        {
+            <tr><td>@m.CreatedAt.ToString("HH:mm") @DisplayNames.Of(m.Type)@(m.AffectsCash ? "" : "*")<br />@m.Description</td><td class="r">@F.M(m.AmountCents)</td></tr>
+        }
+    </table>
+    if (s.Movements.Any(m => !m.AffectsCash)) { <div>* no fue en efectivo</div> }
+}
+@if (Model.IsManager)
+{
+    <div class="sep"></div>
+    <table><tr><td>Ganancia bruta</td><td class="r">@F.M(s.GrossProfitCents)</td></tr></table>
+}
+@if (!string.IsNullOrWhiteSpace(c.Notes)) { <div class="sep"></div><div>Nota: @c.Notes</div> }
+@if (closed)
+{
+    <div class="sep"></div>
+    <br /><br />
+    <div style="text-align:center">______________________<br />Firma</div>
+}
