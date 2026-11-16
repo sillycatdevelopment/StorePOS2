@@ -46,3 +46,27 @@ public class InventoryMovement
     public User? User { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>
+/// Links a product sold individually (e.g. "Cigarro Marlboro suelto") to the box/pack it comes from
+/// (e.g. "Cajetilla Marlboro 20"). When the individual pieces run out, a box can be opened (automatically
+/// in the POS, or by hand): the box leaves inventory and <see cref="UnitsPerPack"/> pieces enter.
+/// If the pieces belong to a different owner than the box, that owner "buys" the box at its sale price.
+/// </summary>
+public class PackLink
+{
+    public int Id { get; set; }
+    /// <summary>The product sold individually. A product can come from only one box.</summary>
+    public int UnitProductId { get; set; }
+    public Product? UnitProduct { get; set; }
+    /// <summary>The box/pack product.</summary>
+    public int PackProductId { get; set; }
+    public Product? PackProduct { get; set; }
+    public int UnitsPerPack { get; set; }
+    /// <summary>Who owns (sells) the individual pieces. Null = the same owner as the box that is opened.</summary>
+    public int? UnitOwnerId { get; set; }
+    public Owner? UnitOwner { get; set; }
+    /// <summary>Open a box automatically when a sale needs more pieces than there are.</summary>
+    public bool AutoOpen { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+}

@@ -42,6 +42,7 @@ public class DeletionService(StoreDbContext db, AuditService audit, ICurrentUser
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.CustomerRequests.Where(r => r.ProductId == id).ExecuteUpdateAsync(s => s.SetProperty(r => r.ProductId, (int?)null));
         await db.StockingListItems.Where(i => i.ProductId == id).ExecuteDeleteAsync();
+        await db.PackLinks.Where(l => l.UnitProductId == id || l.PackProductId == id).ExecuteDeleteAsync();
         await db.Products.Where(x => x.Id == id).ExecuteDeleteAsync();
         db.ChangeTracker.Clear();   // drop stale tracked copies of rows deleted directly in the database
         audit.Add("Producto eliminado", "Product", id, p.Name);
@@ -61,6 +62,7 @@ public class DeletionService(StoreDbContext db, AuditService audit, ICurrentUser
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.Products.Where(p => p.PriorityOwnerId == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.PriorityOwnerId, (int?)null));
         await db.StockingListItems.Where(i => i.OwnerId == id).ExecuteUpdateAsync(s => s.SetProperty(i => i.OwnerId, (int?)null));
+        await db.PackLinks.Where(l => l.UnitOwnerId == id).ExecuteUpdateAsync(s => s.SetProperty(l => l.UnitOwnerId, (int?)null));
         await db.Owners.Where(x => x.Id == id).ExecuteDeleteAsync();
         db.ChangeTracker.Clear();   // drop stale tracked copies of rows deleted directly in the database
         audit.Add("Dueño eliminado", "Owner", id, o.Name);
@@ -181,7 +183,7 @@ public class DeletionService(StoreDbContext db, AuditService audit, ICurrentUser
     /// <summary>The catalog and configuration, deleted after the operation tables.</summary>
     private static readonly string[] CatalogTables =
     {
-        "SupplierSchedules", "Products", "Categories", "Owners", "Suppliers", "PaymentMethods", "CashRegisters", "Users", "AppSettings"
+        "SupplierSchedules", "PackLinks", "Products", "Categories", "Owners", "Suppliers", "PaymentMethods", "CashRegisters", "Users", "AppSettings"
     };
 
     /// <summary>

@@ -329,6 +329,148 @@ public class InventoryService(StoreDbContext db, AuditService audit, ICurrentUse
         await tx.CommitAsync();
     }
 
+    // ------------------------------------------------------------------ boxes and individual pieces
+
+    /// <summary>
+    /// Stock per owner as this unit of work sees it: saved lots, plus lots already changed or created
+    /// earlier in the same operation (e.g. a box opened a moment ago in the same sale).
+    /// </summary>
+    public async Task<List<(int OwnerId, long Qty, DateTime Oldest)>> TrackedStockAsync(int productId)
+    {
+        var rows = await db.InventoryLots
+            .Where(l => l.ProductId == productId && l.QtyRemaining > 0)
+            .GroupBy(l => l.OwnerId)
+            .Select(g => new { OwnerId = g.Key, Qty = g.Sum(l => l.QtyRemaining), Oldest = g.Min(l => l.ReceivedAt) })
+            .ToListAsync();
+        var map = rows.ToDictionary(r => r.OwnerId, r => (Qty: r.Qty, Oldest: r.Oldest));
+
+        foreach (var e in db.ChangeTracker.Entries<InventoryLot>().Where(e => e.Entity.ProductId == productId))
+        {
+            long delta = e.State switch
+            {
+                EntityState.Added => e.Entity.QtyRemaining,
+                EntityState.Modified => e.Entity.QtyRemaining - (long)e.OriginalValues[nameof(InventoryLot.QtyRemaining)]!,
+                _ => 0
+            };
+            if (delta == 0) continue;
+            var cur = map.GetValueOrDefault(e.Entity.OwnerId, (0L, e.Entity.ReceivedAt));
+            map[e.Entity.OwnerId] = (cur.Item1 + delta, cur.Item2 < e.Entity.ReceivedAt ? cur.Item2 : e.Entity.ReceivedAt);
+        }
+        return map.Where(kv => kv.Value.Item1 > 0).Select(kv => (kv.Key, kv.Value.Item1, kv.Value.Item2)).ToList();
+    }
+
+    /// <summary>The box↔individual link this product takes part in (as the individual or as the box), if any.</summary>
+    public Task<PackLink?> GetPackLinkAsync(int productId) =>
+        db.PackLinks.AsNoTracking().Include(l => l.UnitProduct).Include(l => l.PackProduct).Include(l => l.UnitOwner)
+          .FirstOrDefaultAsync(l => l.UnitProductId == productId || l.PackProductId == productId);
+
+    /// <summary>Creates or updates the link "<paramref name="unitProductId"/> comes from <paramref name="packProductId"/>".</summary>
+    public async Task SavePackLinkAsync(int unitProductId, int packProductId, int unitsPerPack, int? unitOwnerId, bool autoOpen)
+    {
+        if (unitProductId == packProductId) throw new DomainException("Elige productos distintos para la caja y para el suelto.");
+        if (unitsPerPack < 2) throw new DomainException("Indica cuántas piezas trae cada caja (2 o más).");
+        var products = await db.Products.Where(p => p.Id == unitProductId || p.Id == packProductId).ToListAsync();
+        var unit = products.FirstOrDefault(p => p.Id == unitProductId) ?? throw new DomainException("Producto suelto no encontrado.");
+        var pack = products.FirstOrDefault(p => p.Id == packProductId) ?? throw new DomainException("Producto caja no encontrado.");
+        if (unit.Unit != UnitType.Piece || pack.Unit != UnitType.Piece)
+            throw new DomainException("La caja y el suelto deben venderse por pieza.");
+        if (await db.PackLinks.AnyAsync(l => l.PackProductId == unitProductId || (l.UnitProductId == packProductId)))
+            throw new DomainException("Un producto no puede ser caja y suelto a la vez en distintas ligas.");
+        if (unitOwnerId is int o && !await db.Owners.AnyAsync(x => x.Id == o && x.IsActive))
+            throw new DomainException("El dueño de los sueltos no existe o está inactivo.");
+
+        var link = await db.PackLinks.FirstOrDefaultAsync(l => l.UnitProductId == unitProductId);
+        if (link is null) db.PackLinks.Add(link = new PackLink { UnitProductId = unitProductId, CreatedAt = clock.Now });
+        link.PackProductId = packProductId;
+        link.UnitsPerPack = unitsPerPack;
+        link.UnitOwnerId = unitOwnerId;
+        link.AutoOpen = autoOpen;
+        var ownerName = unitOwnerId is int oid ? await db.Owners.Where(x => x.Id == oid).Select(x => x.Name).FirstAsync() : "el mismo dueño de la caja";
+        audit.Add("Caja y suelto ligados", "Product", unitProductId,
+                  $"{unit.Name} sale de {pack.Name} ({unitsPerPack} piezas). Sueltos de: {ownerName}. Abrir automático: {(autoOpen ? "sí" : "no")}");
+        await db.SaveChangesAsync();
+    }
+
+    public async Task RemovePackLinkAsync(int unitProductId)
+    {
+        var link = await db.PackLinks.Include(l => l.UnitProduct).FirstOrDefaultAsync(l => l.UnitProductId == unitProductId)
+                   ?? throw new DomainException("Este producto no está ligado a una caja.");
+        db.PackLinks.Remove(link);
+        audit.Add("Caja y suelto desligados", "Product", unitProductId, link.UnitProduct?.Name);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Cost of one piece from a box cost, rounded to the centavo.</summary>
+    public static long CostPerPiece(long packCents, int unitsPerPack) =>
+        (long)Math.Round(packCents / (decimal)unitsPerPack, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// Opens <paramref name="packs"/> boxes into individual pieces. Does not save.
+    /// Same owner: the pieces keep the box's real cost (box cost ÷ pieces).
+    /// Different owner: the pieces' owner buys the box from its owner at the box's SALE price; the box owner
+    /// earns that (recorded as a transfer, shown in owner reports) and the pieces cost sale price ÷ pieces.
+    /// Boxes come first from the pieces' own owner (no purchase needed), then the box's priority owner, then the largest stock.
+    /// </summary>
+    public async Task OpenPacksCoreAsync(PackLink link, int packs, int? fromOwnerId = null)
+    {
+        if (packs <= 0) throw new DomainException("Indica cuántas cajas abrir.");
+        var pack = await db.Products.AsNoTracking().FirstAsync(p => p.Id == link.PackProductId);
+        var unit = await db.Products.AsNoTracking().FirstAsync(p => p.Id == link.UnitProductId);
+        var stock = await TrackedStockAsync(pack.Id);
+
+        List<(int OwnerId, long Qty)> order = fromOwnerId is int f
+            ? stock.Where(s => s.OwnerId == f).Select(s => (s.OwnerId, s.Qty)).ToList()
+            : stock.OrderByDescending(s => s.OwnerId == link.UnitOwnerId)
+                   .ThenByDescending(s => s.OwnerId == pack.PriorityOwnerId)
+                   .ThenByDescending(s => s.Qty)
+                   .Select(s => (s.OwnerId, s.Qty)).ToList();
+        if (order.Sum(o => o.Qty) < packs)
+            throw new DomainException($"No hay suficientes \"{pack.Name}\" para abrir: hay {order.Sum(o => o.Qty)}, se necesitan {packs}.");
+
+        var names = await db.Owners.ToDictionaryAsync(o => o.Id, o => o.Name);
+        long remaining = packs;
+        foreach (var (boxOwner, available) in order)
+        {
+            if (remaining == 0) break;
+            long take = Math.Min(remaining, available);
+            remaining -= take;
+            int unitOwner = link.UnitOwnerId ?? boxOwner;
+
+            if (unitOwner == boxOwner)
+            {
+                var taken = await ConsumeFifoCoreAsync(pack.Id, boxOwner, take, MovementType.PackOpened,
+                                                       $"Abierta para vender suelto: {unit.Name}");
+                foreach (var (lot, q) in taken)
+                    AddStockCore(unit.Id, unitOwner, q * link.UnitsPerPack, CostPerPiece(lot.UnitCostCents, link.UnitsPerPack),
+                                 MovementType.UnitsFromPack, $"De {q} × {pack.Name}");
+                audit.Add("Caja abierta", "Product", pack.Id,
+                          $"{take} × {pack.Name} de {names[boxOwner]} → {take * link.UnitsPerPack} × {unit.Name}");
+            }
+            else
+            {
+                long price = pack.SalePriceCents;
+                await ConsumeFifoCoreAsync(pack.Id, boxOwner, take, MovementType.TransferOut,
+                                           $"Vendida a {names[unitOwner]} para vender suelto", price);
+                AddStockCore(unit.Id, unitOwner, take * link.UnitsPerPack, CostPerPiece(price, link.UnitsPerPack),
+                             MovementType.UnitsFromPack, $"Comprada a {names[boxOwner]} a {Money.Format(price)} la caja");
+                audit.Add("Caja comprada a otro dueño y abierta", "Product", pack.Id,
+                          $"{names[unitOwner]} compró {take} × {pack.Name} a {names[boxOwner]} a {Money.Format(price)} c/u → {take * link.UnitsPerPack} × {unit.Name}");
+            }
+        }
+    }
+
+    /// <summary>Opens boxes by hand (from the inventory page).</summary>
+    public async Task OpenPacksAsync(int productId, int packs, int? fromOwnerId)
+    {
+        var link = await db.PackLinks.AsNoTracking().FirstOrDefaultAsync(l => l.UnitProductId == productId || l.PackProductId == productId)
+                   ?? throw new DomainException("Primero liga la caja con su producto suelto.");
+        using var _ = await gate.EnterAsync();
+        await using var tx = await db.Database.BeginTransactionAsync();
+        await OpenPacksCoreAsync(link, packs, fromOwnerId);
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+    }
+
     private async Task EnsureActiveAsync(int productId, int ownerId)
     {
         if (!await db.Products.AnyAsync(p => p.Id == productId)) throw new DomainException("Producto no encontrado.");

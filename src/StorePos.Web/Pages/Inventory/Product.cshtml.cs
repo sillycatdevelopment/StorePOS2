@@ -18,6 +18,9 @@ public class ProductModel(ProductService products, InventoryService inventory, O
     public List<InventoryLot> Lots { get; private set; } = new();
     public PagedResult<MovementRow> Movements { get; private set; } = null!;
     public List<Owner> Owners { get; private set; } = new();
+    public PackLink? Link { get; private set; }
+    public List<Option> ProductOptions { get; private set; } = new();
+    public long PackStock { get; private set; }
 
     private async Task<bool> LoadAsync()
     {
@@ -28,6 +31,9 @@ public class ProductModel(ProductService products, InventoryService inventory, O
         Lots = await inventory.GetOpenLotsAsync(Id);
         Movements = await inventory.GetMovementsAsync(Id, null, null, null, null, PageNumber, 30);
         Owners = await owners.GetAllAsync(includeInactive: false);
+        Link = await inventory.GetPackLinkAsync(Id);
+        if (Link is null) ProductOptions = (await products.GetOptionsAsync()).Where(o => o.Id != Id).ToList();
+        else PackStock = await inventory.GetStockAsync(Link.PackProductId);
         return true;
     }
 
@@ -66,6 +72,31 @@ public class ProductModel(ProductService products, InventoryService inventory, O
         var p = await products.GetAsync(Id); if (p is null) return NotFound();
         await TryAsync(() => inventory.TransferAsync(Id, fromOwnerId, toOwnerId, Qty.FromDisplay(qty, p.Unit), Money.ToCents(unitPrice), reason),
                        "Traspaso registrado.");
+        return await Done();
+    }
+
+    // ---- Box ↔ individual pieces (e.g. cigarette packs and single cigarettes)
+
+    public async Task<IActionResult> OnPostLinkAsync(string role, int otherProductId, int unitsPerPack, int? unitOwnerId, bool autoOpen)
+    {
+        if (!IsManager) return Forbid();
+        bool thisIsUnit = role == "unit";
+        await TryAsync(() => inventory.SavePackLinkAsync(thisIsUnit ? Id : otherProductId, thisIsUnit ? otherProductId : Id,
+                                                         unitsPerPack, unitOwnerId, autoOpen), "Caja y suelto ligados.");
+        return await Done();
+    }
+
+    public async Task<IActionResult> OnPostUnlinkAsync(int unitProductId)
+    {
+        if (!IsManager) return Forbid();
+        await TryAsync(() => inventory.RemovePackLinkAsync(unitProductId), "Se quitó la liga entre caja y suelto.");
+        return await Done();
+    }
+
+    public async Task<IActionResult> OnPostOpenPacksAsync(int packs, int? fromOwnerId)
+    {
+        if (!IsManager) return Forbid();
+        await TryAsync(() => inventory.OpenPacksAsync(Id, packs, fromOwnerId), packs == 1 ? "Caja abierta." : $"{packs} cajas abiertas.");
         return await Done();
     }
 }

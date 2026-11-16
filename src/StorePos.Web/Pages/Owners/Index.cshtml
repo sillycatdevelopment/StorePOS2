@@ -10,7 +10,7 @@
 <div class="table-wrap">
 <table>
     <thead><tr><th>Dueño</th><th>Contacto</th><th class="num">Productos con existencia</th><th class="num">Inventario a costo</th><th class="num">Inventario a precio venta</th>
-        <th class="num">Ingresos del periodo</th><th class="num">Costo</th><th class="num">Ganancia bruta</th><th></th></tr></thead>
+        <th class="num">Ingresos del periodo</th><th class="num">Costo</th><th class="num">Vendido a otros dueños</th><th class="num">Ganancia total</th><th></th></tr></thead>
     <tbody>
     @foreach (var s in Model.Stats)
     {
@@ -19,7 +19,9 @@
             <td class="small">@s.Owner.Contact</td>
             <td class="num">@s.ProductsInStock</td>
             <td class="num">@F.M(s.InventoryCostCents)</td><td class="num">@F.M(s.InventoryRetailCents)</td>
-            <td class="num">@F.M(s.RevenueCents)</td><td class="num">@F.M(s.CostCents)</td><td class="num"><strong>@F.M(s.ProfitCents)</strong></td>
+            <td class="num">@F.M(s.RevenueCents)</td><td class="num">@F.M(s.CostCents)</td>
+            <td class="num" title="Ganancia: @F.M(s.TransferRevenueCents - s.TransferCostCents)">@F.M(s.TransferRevenueCents)</td>
+            <td class="num"><strong>@F.M(s.ProfitCents)</strong></td>
             <td class="actions">
                 <a class="btn small" href="/Inventory?ownerId=@s.Owner.Id">Inventario</a>
                 <a class="btn small" href="/Sales?ownerId=@s.Owner.Id&from=@F.Iso(Model.Range.From)&to=@F.Iso(Model.Range.To)">Ventas</a>
@@ -31,8 +33,9 @@
     <tr class="total"><td colspan="3">Total</td>
         <td class="num">@F.M(Model.Stats.Sum(s => s.InventoryCostCents))</td><td class="num">@F.M(Model.Stats.Sum(s => s.InventoryRetailCents))</td>
         <td class="num">@F.M(Model.Stats.Sum(s => s.RevenueCents))</td><td class="num">@F.M(Model.Stats.Sum(s => s.CostCents))</td>
+        <td class="num">@F.M(Model.Stats.Sum(s => s.TransferRevenueCents))</td>
         <td class="num">@F.M(Model.Stats.Sum(s => s.ProfitCents))</td><td></td></tr>
     </tbody>
 </table>
 </div>
-<p class="muted small">Cada venta guarda de qué dueño salió la mercancía y a qué costo; estos totales no mezclan el inventario de distintos dueños.</p>
+<p class="muted small">Cada venta guarda de qué dueño salió la mercancía y a qué costo; estos totales no mezclan el inventario de distintos dueños. “Vendido a otros dueños” son traspasos y cajas que otro dueño compró para vender suelto (no cuentan como ventas de la tienda ni como efectivo).</p>

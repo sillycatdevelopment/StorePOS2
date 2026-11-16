@@ -13,7 +13,11 @@ public enum MovementType
     Damaged = 5,
     Correction = 6,
     TransferOut = 7,
-    TransferIn = 8
+    TransferIn = 8,
+    /// <summary>A box/pack opened by its own owner to sell the pieces individually.</summary>
+    PackOpened = 9,
+    /// <summary>Individual pieces that came out of an opened box/pack.</summary>
+    UnitsFromPack = 10
 }
 
 public enum AllocationMode { Manual = 0, OldestFirst = 1, Automatic = 2 }

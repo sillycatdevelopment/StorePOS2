@@ -45,7 +45,10 @@ public class OwnerStats
     public long RevenueCents { get; init; }
     public long CostCents { get; init; }
     public int SaleLines { get; init; }
-    public long ProfitCents => RevenueCents - CostCents;
+    /// <summary>Stock this owner sold to other owners (transfers, boxes bought to sell individually).</summary>
+    public long TransferRevenueCents { get; init; }
+    public long TransferCostCents { get; init; }
+    public long ProfitCents => RevenueCents - CostCents + TransferRevenueCents - TransferCostCents;
 }
 
 public record UpcomingDelivery(DateOnly Date, int SupplierId, string SupplierName, bool ReceivedToday);
@@ -115,7 +118,7 @@ public class MovementRow
 public record PosOwnerStock(int OwnerId, string Name, long Qty);
 
 public record PosProduct(int Id, string Name, string? Barcode, UnitType Unit, long PriceCents,
-                         List<PosOwnerStock> Owners, bool NeedsOwnerChoice);
+                         List<PosOwnerStock> Owners, bool NeedsOwnerChoice, long PackUnits = 0);
 
 public class SaleLineRequest
 {

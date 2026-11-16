@@ -603,3 +603,81 @@ public class StartupInventoryTests
         }));
     }
 }
+
+public class PackTests
+{
+    [Fact]
+    public async Task Same_owner_box_opens_automatically_and_singles_keep_the_real_cost()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("Hermano");
+        int box = await h.ProductAsync("Marlboro cajetilla 20", 90m, 75m);
+        int single = await h.ProductAsync("Marlboro suelto", 6m);
+        await h.StockAsync(box, a, 2, 75m);
+        await h.Get<InventoryService>().SavePackLinkAsync(single, box, 20, null, true);
+        await h.OpenCashAsync();
+
+        int id = await h.Get<SalesService>().CompleteSaleAsync(new SaleRequest
+        {
+            PaymentMethodId = h.MethodId("Efectivo"), Lines = { new SaleLineRequest { ProductId = single, Quantity = 3 } }
+        });
+        h.NewScope();
+        var inv = h.Get<InventoryService>();
+        Assert.Equal(1, await inv.GetStockAsync(box));
+        Assert.Equal(17, await inv.GetStockAsync(single));
+        var item = (await h.Get<SalesService>().GetSaleAsync(id))!.Items.Single();
+        Assert.Equal(3 * 375, item.CostCents);           // $75 / 20 = $3.75 each
+        Assert.Equal(1800 - 1125, item.LineTotalCents - item.CostCents);
+    }
+
+    [Fact]
+    public async Task Different_owner_buys_the_box_at_its_sale_price()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int brother = await h.OwnerAsync("Hermano"), mom = await h.OwnerAsync("Mamá");
+        int box = await h.ProductAsync("Marlboro cajetilla 20", 90m, 75m);
+        int single = await h.ProductAsync("Marlboro suelto", 6m);
+        await h.StockAsync(box, brother, 3, 75m);
+        await h.Get<InventoryService>().SavePackLinkAsync(single, box, 20, mom, true);
+        await h.OpenCashAsync();
+
+        int id = await h.Get<SalesService>().CompleteSaleAsync(new SaleRequest
+        {
+            PaymentMethodId = h.MethodId("Efectivo"), Lines = { new SaleLineRequest { ProductId = single, Quantity = 1 } }
+        });
+        h.NewScope();
+        var inv = h.Get<InventoryService>();
+        Assert.Equal(2, await inv.GetStockAsync(box, brother));
+        Assert.Equal(19, await inv.GetStockAsync(single, mom));
+
+        var item = (await h.Get<SalesService>().GetSaleAsync(id))!.Items.Single();
+        Assert.Equal(mom, item.OwnerId);
+        Assert.Equal(450, item.CostCents);                // $90 / 20 = $4.50 each
+
+        var stats = await h.Get<OwnerService>().GetStatsAsync(h.Clock.Today, h.Clock.Today);
+        var b = stats.Single(s => s.Owner.Id == brother);
+        Assert.Equal(9000, b.TransferRevenueCents);
+        Assert.Equal(7500, b.TransferCostCents);
+        Assert.Equal(1500, b.ProfitCents);                // brother earns on the box
+        Assert.Equal(600 - 450, stats.Single(s => s.Owner.Id == mom).ProfitCents);
+    }
+
+    [Fact]
+    public async Task Boxes_can_be_opened_by_hand_and_links_are_validated()
+    {
+        await using var h = await TestHost.CreateAsync();
+        int a = await h.OwnerAsync("A");
+        int box = await h.ProductAsync("Caja", 90m, 75m);
+        int single = await h.ProductAsync("Suelto", 6m);
+        var inv = h.Get<InventoryService>();
+        await Assert.ThrowsAsync<DomainException>(() => inv.SavePackLinkAsync(single, single, 20, null, true));
+        await Assert.ThrowsAsync<DomainException>(() => inv.SavePackLinkAsync(single, box, 1, null, true));
+        await h.StockAsync(box, a, 1, 75m);
+        await inv.SavePackLinkAsync(single, box, 20, null, false);
+        await Assert.ThrowsAsync<DomainException>(() => inv.OpenPacksAsync(single, 2, null));
+        await inv.OpenPacksAsync(box, 1, null);
+        h.NewScope();
+        Assert.Equal(0, await h.Get<InventoryService>().GetStockAsync(box));
+        Assert.Equal(20, await h.Get<InventoryService>().GetStockAsync(single));
+    }
+}

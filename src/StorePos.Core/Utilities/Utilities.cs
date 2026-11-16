@@ -183,6 +183,8 @@ public static class DisplayNames
         MovementType.Correction => "Corrección manual",
         MovementType.TransferOut => "Traspaso (salida)",
         MovementType.TransferIn => "Traspaso (entrada)",
+        MovementType.PackOpened => "Caja abierta",
+        MovementType.UnitsFromPack => "Sueltos de caja abierta",
         _ => t.ToString()
     };
 

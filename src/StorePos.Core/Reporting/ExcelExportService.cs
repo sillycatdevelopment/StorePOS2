@@ -15,7 +15,7 @@ public record Col<T>(string Header, Func<T, object?> Value, ColKind Kind = ColKi
 
 /// <summary>Excel exports built with ClosedXML: clear headers, MXN currency format, dates, totals, filters.</summary>
 public class ExcelExportService(StoreDbContext db, ReportService reports, InventoryService inventory,
-                                CashService cash, StockingService stocking, SettingsService settings)
+                                CashService cash, StockingService stocking, SettingsService settings, OwnerService owners)
 {
     private const string MoneyFmt = "\"$\"#,##0.00;-\"$\"#,##0.00";
     private const string DateFmt = "dd/mm/yyyy";
@@ -254,11 +254,15 @@ public class ExcelExportService(StoreDbContext db, ReportService reports, Invent
         using var wb = new XLWorkbook();
         var s = await reports.GetSummaryAsync(from, to, ownerId);
         var (cost, retail) = await inventory.GetInventoryValueAsync(ownerId);
+        var stats = (await owners.GetStatsAsync(from, to)).FirstOrDefault(x => x.Owner.Id == ownerId);
         AddKeyValueSheet(wb, "Resumen", $"Reporte del dueño {name}", new (string, object, ColKind)[]
         {
             ("Dueño", name, ColKind.Text), ("Periodo", Range(from, to), ColKind.Text),
             ("Ingresos", s.RevenueCents, ColKind.Money), ("Costo", s.CostCents, ColKind.Money),
-            ("Ganancia bruta", s.ProfitCents, ColKind.Money), ("Ventas en que participó", s.SaleCount, ColKind.Int),
+            ("Ganancia bruta en ventas", s.ProfitCents, ColKind.Money), ("Ventas en que participó", s.SaleCount, ColKind.Int),
+            ("Vendido a otros dueños (cajas, traspasos)", stats?.TransferRevenueCents ?? 0L, ColKind.Money),
+            ("Costo de lo vendido a otros dueños", stats?.TransferCostCents ?? 0L, ColKind.Money),
+            ("Ganancia total", stats?.ProfitCents ?? s.ProfitCents, ColKind.Money),
             ("Inventario actual (costo)", cost, ColKind.Money), ("Inventario actual (precio de venta)", retail, ColKind.Money),
         });
         AddSheet(wb, "Ventas", await reports.GetItemsAsync(from, to, ownerId), ItemCols, $"Ventas de {name}, {Range(from, to)}");

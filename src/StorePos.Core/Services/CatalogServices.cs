@@ -42,6 +42,10 @@ public class ProductService(StoreDbContext db, AuditService audit, IClock clock)
     public Task<Product?> GetAsync(int id) =>
         db.Products.AsNoTracking().Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
 
+    /// <summary>All active products as id/name pairs, for selection lists.</summary>
+    public Task<List<Option>> GetOptionsAsync() =>
+        db.Products.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.SearchName).Select(p => new Option(p.Id, p.Name)).ToListAsync();
+
     public Task<Product?> FindByBarcodeAsync(string barcode)
     {
         var code = barcode.Trim();
@@ -171,9 +175,18 @@ public class OwnerService(StoreDbContext db, AuditService audit, IClock clock)
                 Lines = g.Count()
             }).ToListAsync();
 
+        // Stock sold to another owner (manual transfers and boxes bought to sell individually).
+        var fromDt = from.ToDateTime(TimeOnly.MinValue);
+        var toDt = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var transfers = await db.InventoryMovements.AsNoTracking()
+            .Where(m => m.Type == MovementType.TransferOut && m.CreatedAt >= fromDt && m.CreatedAt < toDt)
+            .Select(m => new { m.OwnerId, m.Quantity, m.UnitCostCents, Price = m.UnitPriceCents ?? 0, m.Product!.Unit })
+            .ToListAsync();
+
         return owners.Select(o =>
         {
             var s = sales.FirstOrDefault(x => x.OwnerId == o.Id);
+            var t = transfers.Where(x => x.OwnerId == o.Id).ToList();
             var lots = stock.Where(l => l.OwnerId == o.Id).ToList();
             return new OwnerStats
             {
@@ -183,7 +196,9 @@ public class OwnerService(StoreDbContext db, AuditService audit, IClock clock)
                 InventoryRetailCents = lots.Sum(l => Money.LineAmount(l.SalePriceCents, l.QtyRemaining, l.Unit)),
                 RevenueCents = s?.Revenue ?? 0,
                 CostCents = s?.Cost ?? 0,
-                SaleLines = s?.Lines ?? 0
+                SaleLines = s?.Lines ?? 0,
+                TransferRevenueCents = t.Sum(x => Money.LineAmount(x.Price, -x.Quantity, x.Unit)),
+                TransferCostCents = t.Sum(x => Money.LineAmount(x.UnitCostCents, -x.Quantity, x.Unit))
             };
         }).ToList();
     }

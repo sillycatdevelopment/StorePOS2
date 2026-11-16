@@ -210,12 +210,23 @@ public class StockingService(StoreDbContext db, SettingsService settings, TrendS
             .Select(g => new { ProductId = g.Key, Count = g.Sum(r => r.RequestCount), Qty = g.Sum(r => r.TotalQuantity) })
             .ToDictionaryAsync(x => x.ProductId);
 
+        // Individual pieces that come out of boxes are not bought: their demand is added to the box (in boxes per day).
+        var packLinks = await db.PackLinks.AsNoTracking().ToListAsync();
+        var unitIds = packLinks.Select(l => l.UnitProductId).ToHashSet();
+
         var result = new List<ReorderSuggestion>();
         foreach (var p in products)
         {
+            if (unitIds.Contains(p.Id)) continue;
             long qty = stock.TryGetValue(p.Id, out var s) ? s.Qty : 0;
             demand.TryGetValue(p.Id, out var d);
             double avg = d?.AdjustedDailyAverage ?? 0;
+            foreach (var l in packLinks.Where(l => l.PackProductId == p.Id))
+            {
+                if (demand.TryGetValue(l.UnitProductId, out var ud)) avg += ud.AdjustedDailyAverage / l.UnitsPerPack;
+                // Loose pieces still on the shelf count as part of a box.
+                if (stock.TryGetValue(l.UnitProductId, out var us)) qty += us.Qty / l.UnitsPerPack;
+            }
             var days = p.PreferredSupplierId is int sid && schedules.TryGetValue(sid, out var ds) ? ds : new List<DayOfWeek>();
             int daysToNext = SupplierService.DaysToNextDelivery(days, today) ?? defaultCycle;
             double cycle = SupplierService.CycleDays(days) ?? defaultCycle;

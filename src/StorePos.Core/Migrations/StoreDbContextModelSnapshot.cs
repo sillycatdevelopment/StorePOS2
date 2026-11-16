@@ -598,6 +598,45 @@ namespace StorePos.Core.Migrations
                     b.ToTable("Owners");
                 });
 
+            modelBuilder.Entity("StorePos.Core.Models.PackLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AutoOpen")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PackProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("UnitOwnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UnitProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UnitsPerPack")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackProductId");
+
+                    b.HasIndex("UnitOwnerId");
+
+                    b.HasIndex("UnitProductId")
+                        .IsUnique();
+
+                    b.ToTable("PackLinks", t =>
+                        {
+                            t.HasCheckConstraint("CK_PackLink", "UnitsPerPack >= 2 AND UnitProductId <> PackProductId");
+                        });
+                });
+
             modelBuilder.Entity("StorePos.Core.Models.PaymentMethod", b =>
                 {
                     b.Property<int>("Id")
@@ -1319,6 +1358,32 @@ namespace StorePos.Core.Migrations
                     b.Navigation("Sale");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("StorePos.Core.Models.PackLink", b =>
+                {
+                    b.HasOne("StorePos.Core.Models.Product", "PackProduct")
+                        .WithMany()
+                        .HasForeignKey("PackProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("StorePos.Core.Models.Owner", "UnitOwner")
+                        .WithMany()
+                        .HasForeignKey("UnitOwnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("StorePos.Core.Models.Product", "UnitProduct")
+                        .WithMany()
+                        .HasForeignKey("UnitProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PackProduct");
+
+                    b.Navigation("UnitOwner");
+
+                    b.Navigation("UnitProduct");
                 });
 
             modelBuilder.Entity("StorePos.Core.Models.Product", b =>

@@ -5,6 +5,7 @@
     ViewData["Title"] = p.Name;
     var unit = Qty.UnitName(p.Unit);
     var step = p.Unit == UnitType.Kilogram ? "0.001" : "1";
+    string PackStockText() => Model.Link is null ? "" : Model.PackStock + " " + (Model.PackStock == 1 ? "caja" : "cajas");
 }
 <div class="toolbar">
     <h1>@p.Name <span class="muted small">@p.Barcode</span></h1><span class="spacer"></span>
@@ -109,6 +110,86 @@
         </div>
     }
 </div>
+
+@if (Model.IsManager)
+{
+    var link = Model.Link;
+    <div class="card">
+        <h2>Caja y sueltos</h2>
+        @if (link is not null)
+        {
+            var isUnit = link.UnitProductId == p.Id;
+            <p>
+                <strong>@link.UnitProduct!.Name</strong> sale de <strong>@link.PackProduct!.Name</strong>:
+                cada caja trae <strong>@link.UnitsPerPack</strong> piezas.
+                Los sueltos son de <strong>@(link.UnitOwner?.Name ?? "el mismo dueño de la caja")</strong>.
+                @(link.AutoOpen ? "Se abre una caja automáticamente cuando se acaban los sueltos." : "Las cajas se abren a mano.")
+            </p>
+            <p class="muted small">
+                Si la caja es de otro dueño, quien vende los sueltos se la compra al precio de venta de la caja
+                (@F.M(link.PackProduct.SalePriceCents)): cada suelto le cuesta @F.M(StorePos.Core.Services.InventoryService.CostPerPiece(link.PackProduct.SalePriceCents, link.UnitsPerPack))
+                y el dueño de la caja registra esa venta en su reporte. Si es del mismo dueño, cada suelto cuesta lo que costó la caja ÷ @link.UnitsPerPack.
+            </p>
+            <div class="actions">
+                <form method="post" asp-page-handler="OpenPacks" asp-route-id="@p.Id" class="toolbar" style="margin:0">
+                    <label>Abrir <input name="packs" type="number" min="1" value="1" style="width:70px;min-width:0" /> caja(s)</label>
+                    <span class="muted small">(hay @PackStockText())</span>
+                    <button class="btn">Abrir ahora</button>
+                </form>
+                <a class="btn" href="/Inventory/Product?id=@(isUnit ? link.PackProductId : link.UnitProductId)">Ver @(isUnit ? "la caja" : "los sueltos")</a>
+                <form method="post" asp-page-handler="Unlink" asp-route-id="@p.Id" data-confirm="¿Quitar la liga entre la caja y el suelto?">
+                    <input type="hidden" name="unitProductId" value="@link.UnitProductId" />
+                    <button class="btn small danger">Desligar</button>
+                </form>
+            </div>
+            <details style="margin-top:8px">
+                <summary>Cambiar la liga</summary>
+                <form method="post" asp-page-handler="Link" asp-route-id="@p.Id" class="form-grid">
+                    <input type="hidden" name="role" value="@(isUnit ? "unit" : "pack")" />
+                    <input type="hidden" name="otherProductId" value="@(isUnit ? link.PackProductId : link.UnitProductId)" />
+                    <label>Piezas por caja <input name="unitsPerPack" type="number" min="2" value="@link.UnitsPerPack" required /></label>
+                    <label>Los sueltos son de
+                        <select name="unitOwnerId">
+                            <option value="">El mismo dueño de la caja</option>
+                            @foreach (var o in Model.Owners) { <option value="@o.Id" selected="@(link.UnitOwnerId == o.Id)">@o.Name</option> }
+                        </select>
+                    </label>
+                    <label class="check"><input type="checkbox" name="autoOpen" value="true" checked="@link.AutoOpen" /> Abrir caja automáticamente al vender</label>
+                    <input type="hidden" name="autoOpen" value="false" />
+                    <div><button class="btn">Guardar</button></div>
+                </form>
+            </details>
+        }
+        else
+        {
+            <p class="muted small">Para productos que se venden por caja y también sueltos (por ejemplo cigarros): liga los dos productos y el punto de venta abrirá una caja cuando se acaben los sueltos.</p>
+            <form method="post" asp-page-handler="Link" asp-route-id="@p.Id" class="form-grid">
+                <label>Este producto es
+                    <select name="role">
+                        <option value="unit">El suelto (pieza individual)</option>
+                        <option value="pack">La caja / cajetilla</option>
+                    </select>
+                </label>
+                <label>El otro producto
+                    <select name="otherProductId" required>
+                        <option value="">— elegir —</option>
+                        @foreach (var o in Model.ProductOptions) { <option value="@o.Id">@o.Name</option> }
+                    </select>
+                </label>
+                <label>Piezas por caja <input name="unitsPerPack" type="number" min="2" value="20" required /></label>
+                <label>Los sueltos son de
+                    <select name="unitOwnerId">
+                        <option value="">El mismo dueño de la caja</option>
+                        @foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }
+                    </select>
+                </label>
+                <label class="check"><input type="checkbox" name="autoOpen" value="true" checked /> Abrir caja automáticamente al vender</label>
+                <input type="hidden" name="autoOpen" value="false" />
+                <div><button class="btn primary">Ligar caja y suelto</button></div>
+            </form>
+        }
+    </div>
+}
 
 <div class="card">
     <h2>Historial de movimientos</h2>

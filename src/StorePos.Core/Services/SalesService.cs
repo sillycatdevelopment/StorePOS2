@@ -39,12 +39,22 @@ public class SalesService(StoreDbContext db, InventoryService inventory, Product
             .Select(g => new { g.Key.ProductId, g.Key.OwnerId, g.Key.Name, Qty = g.Sum(l => l.QtyRemaining) })
             .ToListAsync();
         var mode = await settings.GetAllocationModeAsync();
+
+        // Pieces that can still come out of closed boxes (auto-open links only).
+        var links = await db.PackLinks.AsNoTracking().Where(l => ids.Contains(l.UnitProductId) && l.AutoOpen).ToListAsync();
+        var packIds = links.Select(l => l.PackProductId).ToList();
+        var packStock = await db.InventoryLots.AsNoTracking().Where(l => packIds.Contains(l.ProductId) && l.QtyRemaining > 0)
+            .GroupBy(l => l.ProductId).Select(g => new { ProductId = g.Key, Qty = g.Sum(l => l.QtyRemaining) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Qty);
+
         return products.Select(p =>
         {
             var owners = stock.Where(s => s.ProductId == p.Id).OrderBy(s => s.Name)
                               .Select(s => new PosOwnerStock(s.OwnerId, s.Name, s.Qty)).ToList();
+            var link = links.FirstOrDefault(l => l.UnitProductId == p.Id);
+            long packUnits = link is null ? 0 : packStock.GetValueOrDefault(link.PackProductId) * link.UnitsPerPack;
             return new PosProduct(p.Id, p.Name, p.Barcode, p.Unit, p.SalePriceCents, owners,
-                                  NeedsOwnerChoice: mode == AllocationMode.Manual && owners.Count > 1);
+                                  NeedsOwnerChoice: mode == AllocationMode.Manual && owners.Count > 1, PackUnits: packUnits);
         }).ToList();
     }
 
@@ -101,6 +111,7 @@ public class SalesService(StoreDbContext db, InventoryService inventory, Product
             if (!products.TryGetValue(line.ProductId, out var product) || !product.IsActive)
                 throw new DomainException("Uno de los productos no existe o está inactivo.");
 
+            await OpenPacksIfNeededAsync(product, line);
             var split = await AllocateAsync(product, line.Quantity, line.OwnerId, mode, policy);
             var shares = SplitProportional(line.DiscountCents, split.Select(s => s.Qty).ToList());
 
@@ -180,29 +191,16 @@ public class SalesService(StoreDbContext db, InventoryService inventory, Product
     private async Task<List<(int OwnerId, long Qty)>> AllocateAsync(Product product, long qty, int? requestedOwner,
                                                                     AllocationMode mode, ShortagePolicy policy)
     {
-        var stock = await db.InventoryLots
-            .Where(l => l.ProductId == product.Id && l.QtyRemaining > 0)
-            .GroupBy(l => l.OwnerId)
-            .Select(g => new { OwnerId = g.Key, Qty = g.Sum(l => l.QtyRemaining), Oldest = g.Min(l => l.ReceivedAt) })
-            .ToListAsync();
-
-        // Lots already consumed earlier in this same sale are tracked but not saved yet: use in-memory balances.
-        foreach (var entry in db.ChangeTracker.Entries<InventoryLot>().Where(e => e.Entity.ProductId == product.Id && e.State == EntityState.Modified))
-        {
-            var s = stock.FirstOrDefault(x => x.OwnerId == entry.Entity.OwnerId);
-            if (s is null) continue;
-            long delta = entry.Entity.QtyRemaining - (long)entry.OriginalValues[nameof(InventoryLot.QtyRemaining)]!;
-            stock[stock.IndexOf(s)] = s with { Qty = s.Qty + delta };
-        }
-        stock = stock.Where(s => s.Qty > 0).ToList();
+        // Saved lots plus anything changed earlier in this same sale (pieces sold, boxes just opened).
+        var stock = await inventory.TrackedStockAsync(product.Id);
 
         var result = new List<(int, long)>();
         long remaining = qty;
 
         if (requestedOwner is int chosen)
         {
-            var s = stock.FirstOrDefault(x => x.OwnerId == chosen);
-            long take = Math.Min(remaining, s?.Qty ?? 0);
+            long have = stock.Where(x => x.OwnerId == chosen).Sum(x => x.Qty);
+            long take = Math.Min(remaining, have);
             if (take > 0) { result.Add((chosen, take)); remaining -= take; }
             if (remaining > 0) await CoverShortageAsync(product, chosen, remaining, policy, result);
             return result;
@@ -249,6 +247,27 @@ public class SalesService(StoreDbContext db, InventoryService inventory, Product
             await CoverShortageAsync(product, shortageOwner.Value, remaining, policy, result);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Individual pieces linked to a box (e.g. single cigarettes): if the sale needs more pieces than there are,
+    /// open as many boxes as needed (or as there are) before allocating. Does not save.
+    /// </summary>
+    private async Task OpenPacksIfNeededAsync(Product product, SaleLineRequest line)
+    {
+        var link = await db.PackLinks.AsNoTracking().FirstOrDefaultAsync(l => l.UnitProductId == product.Id && l.AutoOpen);
+        if (link is null) return;
+        // A cashier who picked a different owner than the one who sells the pieces gets no automatic box.
+        if (line.OwnerId is int chosen && link.UnitOwnerId is int unitOwner && chosen != unitOwner) return;
+
+        var units = await inventory.TrackedStockAsync(product.Id);
+        long have = line.OwnerId is int o ? units.Where(u => u.OwnerId == o).Sum(u => u.Qty) : units.Sum(u => u.Qty);
+        if (have >= line.Quantity) return;
+
+        long boxes = (await inventory.TrackedStockAsync(link.PackProductId)).Sum(b => b.Qty);
+        int needed = (int)Math.Ceiling((line.Quantity - have) / (double)link.UnitsPerPack);
+        int open = (int)Math.Min(needed, boxes);
+        if (open > 0) await inventory.OpenPacksCoreAsync(link, open);
     }
 
     /// <summary>What to do when there is not enough recorded stock.</summary>

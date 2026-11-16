@@ -12,6 +12,7 @@ public class StoreDbContext(DbContextOptions<StoreDbContext> options) : DbContex
     public DbSet<Product> Products => Set<Product>();
     public DbSet<InventoryLot> InventoryLots => Set<InventoryLot>();
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
+    public DbSet<PackLink> PackLinks => Set<PackLink>();
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
@@ -87,6 +88,16 @@ public class StoreDbContext(DbContextOptions<StoreDbContext> options) : DbContex
             e.HasIndex(x => new { x.OwnerId, x.CreatedAt });
             e.HasIndex(x => x.CreatedAt);
             e.HasIndex(x => x.SaleId);
+        });
+
+        b.Entity<PackLink>(e =>
+        {
+            e.HasOne(x => x.UnitProduct).WithMany().HasForeignKey(x => x.UnitProductId);
+            e.HasOne(x => x.PackProduct).WithMany().HasForeignKey(x => x.PackProductId);
+            e.HasOne(x => x.UnitOwner).WithMany().HasForeignKey(x => x.UnitOwnerId);
+            e.HasIndex(x => x.UnitProductId).IsUnique();
+            e.HasIndex(x => x.PackProductId);
+            e.ToTable(t => t.HasCheckConstraint("CK_PackLink", "UnitsPerPack >= 2 AND UnitProductId <> PackProductId"));
         });
 
         b.Entity<PaymentMethod>(e =>

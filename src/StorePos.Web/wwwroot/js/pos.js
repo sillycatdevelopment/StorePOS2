@@ -29,7 +29,8 @@
   function lineGross(l) { return l.p.unit === 1 ? Math.round(l.p.priceCents * l.qty / 1000) : l.p.priceCents * l.qty; }
   function fmtQty(p, q) { return p.unit === 1 ? (q / 1000).toLocaleString('es-MX', { maximumFractionDigits: 3 }) + ' kg' : q + ' pza'; }
   function stockOf(p, ownerId) {
-    return p.owners.reduce(function (s, o) { return s + (ownerId == null || o.ownerId === ownerId ? o.qty : 0); }, 0);
+    var s = p.owners.reduce(function (s, o) { return s + (ownerId == null || o.ownerId === ownerId ? o.qty : 0); }, 0);
+    return ownerId == null ? s + (p.packUnits || 0) : s;   // pieces that can still come out of closed boxes
   }
   function say(text, kind) { msg.textContent = text || ''; msg.style.color = kind === 'error' ? 'var(--bad)' : kind === 'ok' ? 'var(--ok)' : ''; }
   function beep() { try { var a = new (window.AudioContext || window.webkitAudioContext)(); var o = a.createOscillator(); o.frequency.value = 300; o.connect(a.destination); o.start(); setTimeout(function () { o.stop(); a.close(); }, 150); } catch (e) { } }
@@ -63,7 +64,7 @@
     var html = '';
     var withStock = l.p.owners;
     if (withStock.length > 1 && l.p.needsOwnerChoice) html += '<option value="">— elegir dueño —</option>';
-    else if (withStock.length !== 1) html += '<option value="">' + (withStock.length === 0 ? 'Sin existencia' : 'Automático') + '</option>';
+    else if (withStock.length !== 1) html += '<option value="">' + (withStock.length === 0 ? (l.p.packUnits ? 'Se abre una caja' : 'Sin existencia') : 'Automático') + '</option>';
     withStock.forEach(function (o) {
       html += '<option value="' + o.ownerId + '"' + (l.ownerId === o.ownerId ? ' selected' : '') + '>' + esc(o.name) + ' (' + fmtQty(l.p, o.qty) + ')</option>';
     });
@@ -82,7 +83,7 @@
     } else {
       cartBody.innerHTML = cart.map(function (l) {
         var needOwner = l.p.needsOwnerChoice && l.ownerId === null;
-        var avail = stockOf(l.p, l.ownerId);
+        var avail = stockOf(l.p, l.ownerId) + (l.ownerId == null ? 0 : (l.p.packUnits || 0));
         var short = l.qty > avail && !startupMode;
         return '<tr data-key="' + l.key + '">' +
           '<td>' + esc(l.p.name) + (short ? ' <span class="badge bad">existencia: ' + fmtQty(l.p, avail) + '</span>' : '') + '</td>' +
