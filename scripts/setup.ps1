@@ -1,4 +1,4 @@
-# StorePOS 2.0 — build, test and publish (run once on a PC with the .NET 10 SDK).
+﻿# StorePOS 2.0 — build, test and publish (run once on a PC with the .NET 10 SDK).
 # Usage (PowerShell, in the repository folder):   .\scripts\setup.ps1
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -17,7 +17,7 @@ dotnet test StorePos2.slnx -c Release
 
 Write-Host "== Publicando para Windows x64 (no requiere instalar .NET en la tienda) ==" -ForegroundColor Cyan
 dotnet publish src/StorePos.Web -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish
-Copy-Item scripts/Iniciar-StorePOS.bat publish/ -Force
+Copy-Item scripts/Iniciar-StorePOS.bat, scripts/Actualizar-StorePOS.bat, scripts/Actualizar-StorePOS.ps1 publish/ -Force
 
 Write-Host ""
 Write-Host "Listo. Copia la carpeta 'publish' a la computadora de la tienda y abre Iniciar-StorePOS.bat" -ForegroundColor Green

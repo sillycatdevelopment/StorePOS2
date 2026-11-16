@@ -9,5 +9,5 @@ if [ ! -d src/StorePos.Core/Migrations ]; then
 fi
 dotnet test StorePos2.slnx -c Release
 dotnet publish src/StorePos.Web -c Release -r win-x64 --self-contained true -o publish
-cp scripts/Iniciar-StorePOS.bat publish/
+cp scripts/Iniciar-StorePOS.bat scripts/Actualizar-StorePOS.bat scripts/Actualizar-StorePOS.ps1 publish/
 echo "Listo: carpeta publish/ (para Windows). Para probar aquí: dotnet run --project src/StorePos.Web"

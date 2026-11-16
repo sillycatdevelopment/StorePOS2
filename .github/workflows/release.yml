@@ -1,0 +1,46 @@
+# Builds, tests and publishes the Windows package whenever a version tag (v2.0.3, v2.1.0, ...) is pushed.
+# The store PC's updater (Actualizar-StorePOS.ps1) downloads StorePOS-Windows.zip from the latest release.
+name: Publicar versión para Windows
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurar
+        run: |
+          dotnet tool restore
+          dotnet restore StorePos2.slnx
+
+      - name: Verificar que no falten migraciones de la base de datos
+        run: dotnet ef migrations has-pending-model-changes --project src/StorePos.Core --startup-project src/StorePos.Web
+
+      - name: Pruebas
+        run: dotnet test StorePos2.slnx -c Release --no-restore
+
+      - name: Publicar para Windows x64
+        run: dotnet publish src/StorePos.Web -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Empaquetar
+        shell: pwsh
+        run: |
+          Copy-Item scripts/Iniciar-StorePOS.bat, scripts/Actualizar-StorePOS.bat, scripts/Actualizar-StorePOS.ps1 publish/
+          Set-Content publish/version.txt "${{ github.ref_name }}" -Encoding ascii
+          Compress-Archive -Path publish/* -DestinationPath StorePOS-Windows.zip
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: StorePOS-Windows.zip
+          generate_release_notes: true

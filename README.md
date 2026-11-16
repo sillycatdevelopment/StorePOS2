@@ -75,6 +75,25 @@ refunds for sales from closed days, movement journal integrity, transfers, deliv
 aggregation, the documented reorder formula (stock 5, 4/day, next delivery 3 days → 33), stocking
 lists not touching inventory until received, and seasonality thresholds.
 
+## Releasing updates (GitHub) and the automatic updater
+
+**Release** — push a version tag and GitHub builds, tests and publishes the Windows zip by itself
+(`.github/workflows/release.yml`, runs on GitHub's Windows machines, nothing to install):
+```
+git add . && git commit -m "describe the change" && git push
+git tag v2.0.3 && git push origin v2.0.3
+```
+The workflow fails (and nothing is released) if tests fail or if the data model changed without a
+migration. When you change anything in `src/StorePos.Core/Models` or the DbContext, first run
+`dotnet ef migrations add <Name> --project src/StorePos.Core --startup-project src/StorePos.Web` and commit it.
+
+**Update on the store PC** — `Iniciar-StorePOS.bat` checks GitHub every time it starts and installs a newer
+release automatically; `Actualizar-StorePOS.bat` does the same on demand (asking first). The updater
+downloads and checks the package before closing anything, backs up `data\storepos.db` to
+`respaldo_actualizacion\`, and never touches `data\`, `appsettings.json` or the backups. New database
+changes are applied by EF migrations when StorePOS starts. Without internet it simply starts the
+installed version. For a private repository put a read-only token in `$Token` inside `Actualizar-StorePOS.ps1`.
+
 ## Deleting test data
 
 *Configuración → Borrar datos* (administrators) offers two resets, each preceded by an automatic backup:
