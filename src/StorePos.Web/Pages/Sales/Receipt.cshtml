@@ -1,0 +1,36 @@
+@page
+@model StorePos.Web.Pages.Sales.ReceiptModel
+@{ Layout = null; var s = Model.Sale; }
+<!DOCTYPE html>
+<html lang="es-MX">
+<head><meta charset="utf-8" /><title>Ticket #@s.Id</title><link rel="stylesheet" href="~/css/site.css" asp-append-version="true" /></head>
+<body style="background:#fff">
+<div class="receipt">
+    <h2>@Model.StoreName</h2>
+    <div style="text-align:center">Ticket #@s.Id<br />@F.DT(s.CreatedAt)</div>
+    @if (s.Status == SaleStatus.Cancelled) { <div style="text-align:center;font-weight:bold">*** CANCELADA ***</div> }
+    <div class="sep"></div>
+    <table>
+        @foreach (var i in s.Items.GroupBy(x => new { x.ProductId, x.ProductName, x.Unit, x.UnitPriceCents }))
+        {
+            var qty = i.Sum(x => x.Quantity);
+            <tr><td colspan="2">@i.Key.ProductName</td></tr>
+            <tr><td>@F.Q(qty, i.Key.Unit) × @F.M(i.Key.UnitPriceCents)</td><td class="right">@F.M(i.Sum(x => x.LineTotalCents + x.DiscountCents))</td></tr>
+            @if (i.Sum(x => x.DiscountCents) > 0) { <tr><td>  Descuento</td><td class="right">-@F.M(i.Sum(x => x.DiscountCents))</td></tr> }
+        }
+    </table>
+    <div class="sep"></div>
+    <table>
+        <tr><td>Subtotal</td><td class="right">@F.M(s.SubtotalCents)</td></tr>
+        @if (s.DiscountCents > 0) { <tr><td>Descuento</td><td class="right">-@F.M(s.DiscountCents)</td></tr> }
+        <tr><td><strong>TOTAL</strong></td><td class="right"><strong>@F.M(s.TotalCents)</strong></td></tr>
+        <tr><td>@s.PaymentMethodName</td><td class="right">@F.M(s.CashReceivedCents)</td></tr>
+        @if (s.PaymentIsCash) { <tr><td>Cambio</td><td class="right">@F.M(s.ChangeCents)</td></tr> }
+    </table>
+    <div class="sep"></div>
+    <div style="text-align:center">Le atendió: @s.User?.DisplayName<br />@Model.Footer</div>
+    <div class="no-print" style="text-align:center;margin-top:12px"><button class="btn" onclick="window.print()">Imprimir</button></div>
+</div>
+<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 200); });</script>
+</body>
+</html>

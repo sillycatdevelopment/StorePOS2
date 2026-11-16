@@ -1,0 +1,74 @@
+@page
+@model StorePos.Web.Pages.Reports.ProductModel
+@{
+    var p = Model.Product; var d = Model.Demand;
+    ViewData["Title"] = "Tendencia: " + p.Name;
+    long maxMonth = Math.Max(1, Model.Monthly.Count == 0 ? 1 : Model.Monthly.Max(m => m.Qty));
+    long maxDay = Math.Max(1, Model.Weekday.Max());
+    var dayOrder = new[] { 1, 2, 3, 4, 5, 6, 0 };
+}
+<div class="toolbar"><h1>@p.Name</h1><span class="spacer"></span><a class="btn" href="/Inventory/Product?id=@p.Id">Inventario</a></div>
+@if (d is null)
+{
+    <div class="alert warn">Producto inactivo: sin análisis de demanda.</div>
+}
+else
+{
+    if (!d.Reliable) { <div class="alert warn">Datos insuficientes (@d.DaysOfHistory días de historial). Las cifras son orientativas y no deben usarse como pronóstico.</div> }
+    <div class="grid k4">
+        <div class="kpi"><div class="label">Promedio diario (4 sem.)</div><div class="value">@F.Q((long)Math.Round(d.DailyAverage), p.Unit)</div><div class="small muted">@d.DailyAverage.ToString("0.##") @Qty.UnitName(p.Unit)@(p.Unit == UnitType.Kilogram ? " (en gramos)" : "")/día</div></div>
+        <div class="kpi"><div class="label">Tendencia</div><div class="value" style="font-size:1.1rem">@TrendService.Describe(d.Trend)</div><div class="small muted">@(d.ChangeRatio is double c ? F.Pct(c) + " vs. 4 semanas previas" : "")</div></div>
+        <div class="kpi"><div class="label">Existencia</div><div class="value">@F.Q(Model.Stock, p.Unit)</div><div class="small muted">@(d.AdjustedDailyAverage > 0 ? $"Alcanza para ~{Model.Stock / d.AdjustedDailyAverage:0.#} días" : "")</div></div>
+        <div class="kpi"><div class="label">Recomendación</div><div class="value" style="font-size:1.1rem">@TrendService.Describe(Model.Advice)</div></div>
+    </div>
+    <div class="grid c2" style="margin-top:14px">
+        <div class="card">
+            <h2>Ventas mensuales (24 meses)</h2>
+            <table>
+                <thead><tr><th>Mes</th><th class="num">Unidades</th><th class="num">Ingresos</th><th style="width:40%"></th></tr></thead>
+                <tbody>
+                @foreach (var m in Model.Monthly.AsEnumerable().Reverse())
+                {
+                    <tr><td>@TrendService.MonthName(m.Month) @m.Year</td><td class="num">@F.Q(m.Qty, p.Unit)</td><td class="num">@F.M(m.RevenueCents)</td>
+                        <td><div class="bar" style="width:@((int)(100.0 * m.Qty / maxMonth))%"></div></td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <div class="card">
+                <h2>Estacionalidad</h2>
+                @if (!d.SeasonalReliable)
+                {
+                    <p class="muted">Se necesitan al menos 12 meses completos de historial para estimar qué meses se vende más o menos. Hasta entonces no se ajustan las sugerencias por temporada.</p>
+                }
+                else
+                {
+                    <p>@TrendService.SeasonNote(d)</p>
+                    <table>
+                        <thead><tr><th>Mes</th><th class="num">Índice</th><th style="width:50%"></th></tr></thead>
+                        <tbody>
+                        @for (int i = 0; i < 12; i++)
+                        {
+                            var idx = d.SeasonalIndex[i];
+                            <tr><td>@TrendService.MonthName(i + 1)</td><td class="num">@idx.ToString("0.00")</td>
+                                <td><div class="bar" style="width:@((int)Math.Min(100, idx * 50))%;background:@(idx < 0.8 ? "var(--bad)" : idx > 1.2 ? "var(--ok)" : "var(--brand)")"></div></td></tr>
+                        }
+                        </tbody>
+                    </table>
+                    <p class="muted small">1.00 = mes promedio. 0.70 = se vende ~30% menos que un mes normal.</p>
+                }
+            </div>
+            <div class="card">
+                <h2>Por día de la semana (últimas 12 semanas)</h2>
+                <table>
+                    @foreach (var i in dayOrder)
+                    {
+                        <tr><td>@DisplayNames.Of((DayOfWeek)i)</td><td class="num">@F.Q(Model.Weekday[i], p.Unit)</td>
+                            <td style="width:50%"><div class="bar" style="width:@((int)(100.0 * Model.Weekday[i] / maxDay))%"></div></td></tr>
+                    }
+                </table>
+            </div>
+        </div>
+    </div>
+}

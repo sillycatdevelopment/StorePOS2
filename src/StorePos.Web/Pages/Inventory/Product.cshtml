@@ -1,0 +1,131 @@
+@page
+@model StorePos.Web.Pages.Inventory.ProductModel
+@{
+    var p = Model.Product;
+    ViewData["Title"] = p.Name;
+    var unit = Qty.UnitName(p.Unit);
+    var step = p.Unit == UnitType.Kilogram ? "0.001" : "1";
+}
+<div class="toolbar">
+    <h1>@p.Name <span class="muted small">@p.Barcode</span></h1><span class="spacer"></span>
+    @if (Model.IsManager) { <a class="btn" href="/Products/Edit?id=@p.Id">Editar producto</a> <a class="btn" href="/Reports/Product?id=@p.Id">Tendencia</a> }
+</div>
+<div class="grid k4">
+    <div class="kpi"><div class="label">Existencia total</div><div class="value">@F.Q(Model.ByOwner.Sum(o => o.Qty), p.Unit)</div></div>
+    <div class="kpi"><div class="label">Mínimo</div><div class="value">@F.Q(p.MinStock, p.Unit)</div></div>
+    <div class="kpi"><div class="label">Precio de venta</div><div class="value">@F.M(p.SalePriceCents)</div><div class="small muted">por @unit</div></div>
+    @if (Model.IsManager) { <div class="kpi"><div class="label">Valor a costo</div><div class="value">@F.M(Model.ByOwner.Sum(o => o.CostValueCents))</div></div> }
+</div>
+
+<div class="grid c2" style="margin-top:14px">
+    <div class="card">
+        <h2>Existencia por dueño</h2>
+        <table>
+            <thead><tr><th>Dueño</th><th class="num">Cantidad</th>@if (Model.IsManager) { <th class="num">Valor a costo</th><th class="num">Costo prom.</th> }</tr></thead>
+            <tbody>
+            @foreach (var o in Model.ByOwner)
+            {
+                var avg = o.Qty == 0 ? 0 : (long)Math.Round(o.CostValueCents * (decimal)Qty.Scale(p.Unit) / o.Qty);
+                <tr><td>@o.OwnerName</td><td class="num">@F.Q(o.Qty, p.Unit)</td>@if (Model.IsManager) { <td class="num">@F.M(o.CostValueCents)</td><td class="num">@F.M(avg)</td> }</tr>
+            }
+            @if (Model.ByOwner.Count == 0) { <tr><td colspan="4" class="muted">Sin existencia.</td></tr> }
+            </tbody>
+        </table>
+        @if (Model.IsManager)
+        {
+            <h3>Lotes abiertos (se venden del más antiguo al más nuevo dentro de cada dueño)</h3>
+            <table>
+                <thead><tr><th>Dueño</th><th>Recibido</th><th>Origen</th><th class="num">Restante</th><th class="num">Costo</th></tr></thead>
+                <tbody>
+                @foreach (var l in Model.Lots)
+                {
+                    <tr><td>@l.Owner!.Name</td><td>@F.DT(l.ReceivedAt)</td><td>@DisplayNames.Of(l.Source)@(l.Supplier is null ? "" : " · " + l.Supplier.Name)</td>
+                        <td class="num">@F.Q(l.QtyRemaining, p.Unit) / @F.Q(l.QtyReceived, p.Unit)</td><td class="num">@F.M(l.UnitCostCents)</td></tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    @if (Model.IsManager)
+    {
+        <div class="card">
+            <h2>Movimientos de inventario</h2>
+            <details open>
+                <summary><strong>Agregar existencia</strong></summary>
+                <form method="post" asp-page-handler="Add" asp-route-id="@p.Id" class="form-grid">
+                    <label>Dueño <select name="ownerId" required>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</select></label>
+                    <label>Tipo
+                        <select name="type">
+                            <option value="@MovementType.Restock">Resurtido / compra</option>
+                            <option value="@MovementType.InitialStock">Inventario inicial</option>
+                            <option value="@MovementType.Return">Devolución de cliente</option>
+                            <option value="@MovementType.Correction">Corrección manual</option>
+                        </select>
+                    </label>
+                    <label>Cantidad (@unit) <input name="qty" type="number" step="@step" min="0" required /></label>
+                    <label>Costo por @unit <input name="unitCost" type="number" step="0.01" min="0" value="@F.P(p.PurchasePriceCents)" required /></label>
+                    <label>Motivo / nota <input name="reason" maxlength="300" placeholder="Obligatorio en correcciones y devoluciones" /></label>
+                    <div><button class="btn primary">Agregar</button></div>
+                </form>
+                <p class="muted small">Para entregas de proveedores usa <a href="/Suppliers/Delivery">Registrar entrega</a>.</p>
+            </details>
+            <details>
+                <summary><strong>Merma o salida</strong></summary>
+                <form method="post" asp-page-handler="Remove" asp-route-id="@p.Id" class="form-grid">
+                    <label>Dueño <select name="ownerId" required>@foreach (var o in Model.ByOwner) { <option value="@o.OwnerId">@o.OwnerName (@F.Q(o.Qty, p.Unit))</option> }</select></label>
+                    <label>Tipo
+                        <select name="type">
+                            <option value="@MovementType.Damaged">Dañado / caducado / merma</option>
+                            <option value="@MovementType.Correction">Corrección manual</option>
+                        </select>
+                    </label>
+                    <label>Cantidad (@unit) <input name="qty" type="number" step="@step" min="0" required /></label>
+                    <label>Motivo * <input name="reason" maxlength="300" required /></label>
+                    <div><button class="btn danger">Registrar salida</button></div>
+                </form>
+            </details>
+            <details>
+                <summary><strong>Conteo físico</strong></summary>
+                <form method="post" asp-page-handler="Count" asp-route-id="@p.Id" class="form-grid">
+                    <label>Dueño <select name="ownerId" required>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name (@F.Q(Model.ByOwner.FirstOrDefault(x => x.OwnerId == o.Id)?.Qty ?? 0, p.Unit))</option> }</select></label>
+                    <label>Cantidad contada (@unit) <input name="counted" type="number" step="@step" min="0" required /></label>
+                    <label>Motivo * <input name="reason" maxlength="300" required placeholder="Ej. inventario mensual" /></label>
+                    <div><button class="btn">Ajustar al conteo</button></div>
+                </form>
+            </details>
+            <details>
+                <summary><strong>Traspaso entre dueños</strong></summary>
+                <form method="post" asp-page-handler="Transfer" asp-route-id="@p.Id" class="form-grid">
+                    <label>De <select name="fromOwnerId" required>@foreach (var o in Model.ByOwner) { <option value="@o.OwnerId">@o.OwnerName (@F.Q(o.Qty, p.Unit))</option> }</select></label>
+                    <label>Para <select name="toOwnerId" required>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</select></label>
+                    <label>Cantidad (@unit) <input name="qty" type="number" step="@step" min="0" required /></label>
+                    <label>Precio acordado por @unit <input name="unitPrice" type="number" step="0.01" min="0" value="@F.P(p.PurchasePriceCents)" required /></label>
+                    <label>Nota <input name="reason" maxlength="300" /></label>
+                    <div><button class="btn">Traspasar</button></div>
+                </form>
+                <p class="muted small">El dueño que recibe queda con un lote nuevo al precio acordado; el que entrega conserva el historial de su costo.</p>
+            </details>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <h2>Historial de movimientos</h2>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Dueño</th><th class="num">Cantidad</th><th class="num">Costo</th><th>Detalle</th><th>Usuario</th></tr></thead>
+        <tbody>
+        @foreach (var m in Model.Movements.Items)
+        {
+            <tr><td>@F.DT(m.CreatedAt)</td><td>@DisplayNames.Of(m.Type)</td><td>@m.OwnerName</td>
+                <td class="num" style="color:@(m.Quantity < 0 ? "var(--bad)" : "var(--ok)")">@(m.Quantity > 0 ? "+" : "")@F.Q(m.Quantity, m.Unit)</td>
+                <td class="num">@F.M(m.UnitCostCents)</td>
+                <td class="small">@m.Reason @if (m.SaleId is int sid) { <a href="/Sales/Details?id=@sid">venta #@sid</a> } @if (m.DeliveryId is int did) { <a href="/Suppliers/DeliveryDetails?id=@did">entrega #@did</a> }</td>
+                <td>@m.UserName</td></tr>
+        }
+        </tbody>
+    </table>
+    </div>
+    <partial name="_Pager" model="PagerModel.From(Model.Movements, Request)" />
+</div>

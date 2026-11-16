@@ -1,0 +1,41 @@
+@page
+@model StorePos.Web.Pages.Sales.DetailsModel
+@{ var s = Model.Sale; ViewData["Title"] = $"Venta #{s.Id}"; }
+<div class="toolbar">
+    <h1>Venta #@s.Id @if (s.Status == SaleStatus.Cancelled) { <span class="badge bad">Cancelada</span> }</h1><span class="spacer"></span>
+    <a class="btn" href="/Sales/Receipt?id=@s.Id" target="_blank">Ticket</a>
+</div>
+<div class="card">
+    <p>@F.DT(s.CreatedAt) · Cajero: @s.User?.DisplayName · Pago: <strong>@s.PaymentMethodName</strong>
+        @if (s.PaymentIsCash) { <span> · Recibido @F.M(s.CashReceivedCents) · Cambio @F.M(s.ChangeCents)</span> }</p>
+    @if (s.Notes is not null) { <p class="muted">Nota: @s.Notes</p> }
+    @if (s.Status == SaleStatus.Cancelled)
+    {
+        <div class="alert error">Cancelada el @F.DT(s.CancelledAt) por @s.CancelledByUser?.DisplayName. Motivo: @s.CancelReason</div>
+    }
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Producto</th><th>Dueño</th><th class="num">Cantidad</th><th class="num">Precio</th><th class="num">Descuento</th><th class="num">Importe</th>
+            @if (Model.IsManager) { <th class="num">Costo</th><th class="num">Ganancia</th> }</tr></thead>
+        <tbody>
+        @foreach (var i in s.Items)
+        {
+            <tr><td>@i.ProductName <span class="muted small">@i.Barcode</span></td><td>@i.OwnerName</td><td class="num">@F.Q(i.Quantity, i.Unit)</td>
+                <td class="num">@F.M(i.UnitPriceCents)</td><td class="num">@F.M(i.DiscountCents)</td><td class="num">@F.M(i.LineTotalCents)</td>
+                @if (Model.IsManager) { <td class="num">@F.M(i.CostCents)</td><td class="num">@F.M(i.LineTotalCents - i.CostCents)</td> }</tr>
+        }
+        <tr class="total"><td colspan="4">Totales</td><td class="num">@F.M(s.DiscountCents)</td><td class="num">@F.M(s.TotalCents)</td>
+            @if (Model.IsManager) { <td class="num">@F.M(s.CostCents)</td><td class="num">@F.M(s.ProfitCents)</td> }</tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+@if (Model.IsManager && s.Status == SaleStatus.Completed)
+{
+    <form method="post" asp-page-handler="Cancel" asp-route-id="@s.Id" class="card narrow" data-confirm="¿Cancelar la venta #@s.Id? El inventario se devolverá y quedará registrado en la bitácora.">
+        <h2>Cancelar venta</h2>
+        <label>Motivo * <input name="reason" required maxlength="300" /></label>
+        <p class="muted small">Si la venta pertenece a un día ya cerrado y se pagó en efectivo, se registrará un reembolso en la caja abierta.</p>
+        <button class="btn danger">Cancelar venta</button>
+    </form>
+}

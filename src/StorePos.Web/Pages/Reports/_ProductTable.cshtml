@@ -1,0 +1,13 @@
+@model (string Title, List<ProductSales> Rows)
+<div class="card">
+    <h2>@Model.Title</h2>
+    <table>
+        <thead><tr><th>Producto</th><th class="num">Unidades</th><th class="num">Ingresos</th><th class="num">Ganancia</th></tr></thead>
+        <tbody>
+        @foreach (var p in Model.Rows)
+        {
+            <tr><td><a href="/Reports/Product?id=@p.ProductId">@p.Name</a></td><td class="num">@F.Q(p.Units, p.Unit)</td><td class="num">@F.M(p.RevenueCents)</td><td class="num">@F.M(p.ProfitCents)</td></tr>
+        }
+        </tbody>
+    </table>
+</div>

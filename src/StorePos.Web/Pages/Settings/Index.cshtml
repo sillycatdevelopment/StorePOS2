@@ -1,0 +1,58 @@
+@page
+@model StorePos.Web.Pages.Settings.IndexModel
+@{ ViewData["Title"] = "Configuración"; var v = Model.Values; var mode = v[StorePos.Core.Services.SettingKeys.AllocationMode]; }
+<h1>Configuración</h1>
+<partial name="_Nav" />
+<form method="post" class="card">
+    <h2>Tienda</h2>
+    <div class="form-grid">
+        <label>Nombre de la tienda <input name="storeName" value="@v[StorePos.Core.Services.SettingKeys.StoreName]" maxlength="100" /></label>
+        <label>Pie del ticket <input name="receiptFooter" value="@v[StorePos.Core.Services.SettingKeys.ReceiptFooter]" maxlength="200" /></label>
+    </div>
+    <h2>Venta de inventario con varios dueños</h2>
+    <label>Cuando un producto tiene existencia de varios dueños
+        <select name="allocationMode">
+            @foreach (var m in Enum.GetValues<AllocationMode>()) { <option value="@m" selected="@(mode == m.ToString())">@DisplayNames.Of(m)</option> }
+        </select>
+    </label>
+    <p class="muted small">Dentro de cada dueño siempre se vende primero el lote más antiguo (FIFO), así el costo y la ganancia de cada dueño son exactos. En modo manual el cajero elige el dueño en el punto de venta.</p>
+    <h2>Existencias y surtido</h2>
+    <div class="form-grid">
+        <label>“Cerca del mínimo” = hasta este % arriba del mínimo <input name="lowStockMargin" type="number" min="0" max="500" value="@v[StorePos.Core.Services.SettingKeys.LowStockMarginPercent]" /></label>
+        <label>Días de existencia de seguridad <input name="safetyDays" type="number" min="0" max="60" value="@v[StorePos.Core.Services.SettingKeys.SafetyDays]" /></label>
+        <label>Días entre entregas si el proveedor no tiene horario <input name="defaultCycleDays" type="number" min="1" max="60" value="@v[StorePos.Core.Services.SettingKeys.DefaultCycleDays]" /></label>
+        <label>Días de historial para el promedio de venta <input name="historyDays" type="number" min="7" max="180" value="@v[StorePos.Core.Services.SettingKeys.HistoryDays]" /></label>
+    </div>
+    <button class="btn primary">Guardar configuración</button>
+</form>
+<div class="card">
+    <h2>Formas de pago</h2>
+    <p class="muted small">Solo las marcadas como efectivo cuentan en el efectivo esperado del corte de caja.</p>
+    <table>
+        <thead><tr><th>Nombre</th><th>Es efectivo</th><th>Activa</th><th>Orden</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var m in Model.Methods)
+        {
+            <tr><td colspan="5">
+                <form method="post" asp-page-handler="Method" class="toolbar" style="margin:0">
+                    <input type="hidden" name="id" value="@m.Id" />
+                    <input name="name" value="@m.Name" required maxlength="60" />
+                    <label class="check"><input type="checkbox" name="isCash" value="true" checked="@m.IsCash" /> Efectivo</label><input type="hidden" name="isCash" value="false" />
+                    <label class="check"><input type="checkbox" name="isActive" value="true" checked="@m.IsActive" /> Activa</label><input type="hidden" name="isActive" value="false" />
+                    <input name="sortOrder" type="number" value="@m.SortOrder" style="width:70px;min-width:0" />
+                    <button class="btn small">Guardar</button>
+                </form>
+            </td></tr>
+        }
+        <tr><td colspan="5">
+            <form method="post" asp-page-handler="Method" class="toolbar" style="margin:0">
+                <input name="name" required maxlength="60" placeholder="Nueva forma de pago (ej. Vales)" />
+                <label class="check"><input type="checkbox" name="isCash" value="true" /> Efectivo</label><input type="hidden" name="isCash" value="false" />
+                <input type="hidden" name="isActive" value="true" />
+                <input name="sortOrder" type="number" value="10" style="width:70px;min-width:0" />
+                <button class="btn small">Agregar</button>
+            </form>
+        </td></tr>
+        </tbody>
+    </table>
+</div>

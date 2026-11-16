@@ -1,0 +1,46 @@
+@page
+@model StorePos.Web.Pages.Reports.TrendsModel
+@{ ViewData["Title"] = "Tendencias de productos"; }
+<h1>Tendencias y recomendaciones</h1>
+<p class="muted small">Compara las últimas 4 semanas contra las 4 anteriores. Con menos de @TrendService.MinDaysForTrend días de historial o menos de @TrendService.MinUnitsForTrend unidades vendidas se muestra “Datos insuficientes” en lugar de una estimación engañosa. La estacionalidad requiere 12 meses completos.</p>
+<form method="get" class="toolbar card">
+    <label>Producto <input name="q" value="@Model.Q" /></label>
+    <label>Mostrar
+        <select name="show" data-autosubmit>
+            <option value="all" selected="@(Model.Show == "all")">Todos</option>
+            <option value="up" selected="@(Model.Show == "up")">Demanda en aumento</option>
+            <option value="down" selected="@(Model.Show == "down")">Demanda a la baja</option>
+            <option value="increase" selected="@(Model.Show == "increase")">Recomendado aumentar</option>
+            <option value="reduce" selected="@(Model.Show == "reduce")">Recomendado reducir / dejar</option>
+            <option value="seasonal" selected="@(Model.Show == "seasonal")">Con datos estacionales</option>
+        </select>
+    </label>
+    <button class="btn">Filtrar</button>
+</form>
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Producto</th><th class="num">Últimos 7 días</th><th class="num">Últimas 4 sem.</th><th class="num">4 sem. previas</th>
+        <th class="num">Prom. diario</th><th class="num">Prom. semanal</th><th class="num">Demanda mensual est.</th><th>Tendencia</th><th>Estacionalidad</th><th class="num">Existencia</th><th>Recomendación</th></tr></thead>
+    <tbody>
+    @foreach (var r in Model.Result.Items)
+    {
+        var d = r.Demand;
+        <tr>
+            <td><a href="/Reports/Product?id=@d.ProductId">@d.Name</a></td>
+            <td class="num">@F.Q(d.UnitsLast7, d.Unit)</td>
+            <td class="num">@F.Q(d.UnitsLastWindow, d.Unit)</td>
+            <td class="num">@F.Q(d.UnitsPreviousWindow, d.Unit)</td>
+            <td class="num">@F.Q((long)Math.Round(d.DailyAverage), d.Unit)</td>
+            <td class="num">@F.Q((long)Math.Round(d.DailyAverage * 7), d.Unit)</td>
+            <td class="num">@F.Q((long)Math.Round(d.AdjustedDailyAverage * 30), d.Unit)</td>
+            <td><span class="badge @(d.Trend == TrendDirection.Up ? "ok" : d.Trend == TrendDirection.Down ? "bad" : "")">@TrendService.Describe(d.Trend)@(d.ChangeRatio is double c ? " " + F.Pct(c) : "")</span></td>
+            <td class="small">@TrendService.SeasonNote(d)</td>
+            <td class="num">@F.Q(r.Stock, d.Unit)</td>
+            <td><span class="badge @(r.Advice switch { StockAdvice.Increase => "ok", StockAdvice.Reduce => "warn", StockAdvice.Stop => "bad", _ => "" })">@TrendService.Describe(r.Advice)</span></td>
+        </tr>
+    }
+    @if (Model.Result.Items.Count == 0) { <tr><td colspan="11" class="muted">Sin resultados.</td></tr> }
+    </tbody>
+</table>
+</div>
+<partial name="_Pager" model="PagerModel.From(Model.Result, Request)" />

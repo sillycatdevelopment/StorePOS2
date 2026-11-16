@@ -1,0 +1,61 @@
+@inject StorePos.Core.Services.SettingsService Settings
+@{
+    var storeName = await Settings.GetAsync(StorePos.Core.Services.SettingKeys.StoreName);
+    var path = Context.Request.Path.Value ?? "/";
+    bool manager = User.IsInRole("Manager") || User.IsInRole("Administrator");
+    bool admin = User.IsInRole("Administrator");
+    string Active(string prefix) => (prefix == "/" ? path == "/" : path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) ? "active" : "";
+}
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · @storeName</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <input type="checkbox" id="nav-toggle" class="nav-toggle" />
+    <aside class="sidebar">
+        <div class="brand">@storeName</div>
+        <nav>
+            <a class="@Active("/")" href="/">Tablero</a>
+            <a class="@Active("/Pos")" href="/Pos">Punto de venta</a>
+            <a class="@Active("/Products")" href="/Products">Productos</a>
+            <a class="@Active("/Inventory")" href="/Inventory">Inventario</a>
+            @if (manager)
+            {
+                <a class="@Active("/Owners")" href="/Owners">Dueños</a>
+                <a class="@Active("/Suppliers")" href="/Suppliers">Proveedores y entregas</a>
+            }
+            <a class="@Active("/Sales")" href="/Sales">Historial de ventas</a>
+            @if (manager)
+            {
+                <a class="@Active("/Reports")" href="/Reports">Reportes financieros</a>
+                <a class="@Active("/Stocking")" href="/Stocking">Listas de surtido</a>
+            }
+            <a class="@Active("/Requests")" href="/Requests">Solicitudes de clientes</a>
+            <a class="@Active("/Cash")" href="/Cash">Caja y corte</a>
+            @if (admin)
+            {
+                <a class="@Active("/Settings")" href="/Settings">Configuración y respaldos</a>
+            }
+        </nav>
+        <div class="userbox">
+            <span>@User.Identity!.Name</span>
+            <a href="/Account/Password">Contraseña</a>
+            <form method="post" asp-page="/Account/Logout"><button class="link">Salir</button></form>
+        </div>
+    </aside>
+    <label for="nav-toggle" class="nav-button" aria-label="Menú">☰</label>
+}
+<main class="@(User.Identity?.IsAuthenticated == true ? "content" : "content full")">
+    <partial name="_Flash" />
+    @RenderBody()
+</main>
+<script src="~/js/app.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

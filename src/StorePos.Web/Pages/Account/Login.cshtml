@@ -1,0 +1,12 @@
+@page
+@model StorePos.Web.Pages.Account.LoginModel
+@{ ViewData["Title"] = "Iniciar sesión"; }
+<div class="login-box card">
+    <h1>Iniciar sesión</h1>
+    <form method="post">
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <label>Usuario <input name="Username" value="@Model.Username" autofocus autocomplete="username" required /></label>
+        <label>Contraseña <input name="Password" type="password" autocomplete="current-password" required /></label>
+        <button class="btn primary wide">Entrar</button>
+    </form>
+</div>

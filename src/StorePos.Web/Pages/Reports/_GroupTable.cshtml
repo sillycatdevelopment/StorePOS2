@@ -1,0 +1,18 @@
+@model (string Title, List<GroupTotal> Rows)
+<div class="card">
+    <h2>@Model.Title</h2>
+    @{ long max = Model.Rows.Count == 0 ? 1 : Math.Max(1, Model.Rows.Max(r => r.RevenueCents)); }
+    <table>
+        <thead><tr><th></th><th class="num">Ventas</th><th class="num">Ingresos</th><th class="num">Ganancia</th><th class="num">Margen</th><th style="width:20%"></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr><td>@r.Label</td><td class="num">@r.SaleCount</td><td class="num">@F.M(r.RevenueCents)</td><td class="num">@F.M(r.ProfitCents)</td>
+                <td class="num">@(r.RevenueCents == 0 ? "—" : F.Pct(r.ProfitCents / (double)r.RevenueCents))</td>
+                <td><div class="bar" style="width:@((int)(100.0 * r.RevenueCents / max))%"></div></td></tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="muted">Sin ventas en el periodo.</td></tr> }
+        else { <tr class="total"><td>Total</td><td class="num">@Model.Rows.Sum(r => r.SaleCount)</td><td class="num">@F.M(Model.Rows.Sum(r => r.RevenueCents))</td><td class="num">@F.M(Model.Rows.Sum(r => r.ProfitCents))</td><td></td><td></td></tr> }
+        </tbody>
+    </table>
+</div>

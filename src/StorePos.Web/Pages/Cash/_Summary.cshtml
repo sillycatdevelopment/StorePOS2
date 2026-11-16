@@ -1,0 +1,51 @@
+@model CashSummary
+@{ var c = Model.Closing; }
+<div class="grid c2">
+    <div class="card">
+        <h2>Efectivo en caja</h2>
+        <table>
+            <tr><td>Fondo inicial</td><td class="num">@F.M(c.OpeningCashCents)</td></tr>
+            <tr><td>+ Ventas en efectivo</td><td class="num">@F.M(Model.CashSalesCents)</td></tr>
+            <tr><td>+ Depósitos a caja</td><td class="num">@F.M(Model.DepositsCents)</td></tr>
+            @if (Model.OtherInCents > 0) { <tr><td>+ Otras entradas</td><td class="num">@F.M(Model.OtherInCents)</td></tr> }
+            <tr><td>− Retiros</td><td class="num">@F.M(Model.WithdrawalsCents)</td></tr>
+            <tr><td>− Gastos pagados en efectivo</td><td class="num">@F.M(Model.CashExpensesCents)</td></tr>
+            <tr><td>− Reembolsos en efectivo</td><td class="num">@F.M(Model.RefundsCents)</td></tr>
+            @if (Model.OtherOutCents > 0) { <tr><td>− Otras salidas</td><td class="num">@F.M(Model.OtherOutCents)</td></tr> }
+            <tr class="total"><td>Efectivo esperado</td><td class="num">@F.M(Model.ExpectedCashCents)</td></tr>
+            @if (c.Status == ClosingStatus.Closed)
+            {
+                <tr><td>Efectivo contado</td><td class="num">@F.M(c.CountedCashCents)</td></tr>
+                <tr class="total"><td>Diferencia</td><td class="num" style="color:@(c.DifferenceCents == 0 ? "var(--ok)" : "var(--bad)")">@F.M(c.DifferenceCents)</td></tr>
+            }
+        </table>
+        <p class="muted small">Las ventas con tarjeta, transferencia u otros medios no se cuentan como efectivo.</p>
+    </div>
+    <div class="card">
+        <h2>Ventas del día</h2>
+        <table>
+            @foreach (var m in Model.ByMethod)
+            {
+                <tr><td>@m.Name @(m.IsCash ? "" : "(no efectivo)")</td><td class="num">@m.SaleCount</td><td class="num">@F.M(m.AmountCents)</td></tr>
+            }
+            <tr class="total"><td>Total vendido</td><td class="num">@Model.SaleCount</td><td class="num">@F.M(Model.TotalSalesCents)</td></tr>
+            <tr><td>Total de gastos (todos los medios)</td><td></td><td class="num">@F.M(Model.ExpensesCents)</td></tr>
+            <tr><td>Ganancia bruta del día</td><td></td><td class="num">@F.M(Model.GrossProfitCents)</td></tr>
+            <tr><td>Ventas canceladas</td><td class="num">@Model.CancelledCount</td><td></td></tr>
+        </table>
+    </div>
+</div>
+<div class="card">
+    <h2>Movimientos de caja</h2>
+    <table>
+        <thead><tr><th>Hora</th><th>Tipo</th><th>Descripción</th><th class="num">Monto</th><th>Usuario</th></tr></thead>
+        <tbody>
+        @foreach (var m in Model.Movements)
+        {
+            <tr><td>@F.DT(m.CreatedAt)</td><td>@DisplayNames.Of(m.Type)@(m.AffectsCash ? "" : " (no efectivo)")</td><td>@m.Description</td>
+                <td class="num">@F.M(m.AmountCents)</td><td>@m.User?.DisplayName</td></tr>
+        }
+        @if (Model.Movements.Count == 0) { <tr><td colspan="5" class="muted">Sin movimientos.</td></tr> }
+        </tbody>
+    </table>
+</div>

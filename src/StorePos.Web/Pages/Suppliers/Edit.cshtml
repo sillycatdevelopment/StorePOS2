@@ -1,0 +1,25 @@
+@page
+@model StorePos.Web.Pages.Suppliers.EditModel
+@{
+    ViewData["Title"] = Model.Id is null ? "Nuevo proveedor" : "Editar proveedor";
+    var week = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday };
+}
+<h1>@ViewData["Title"]</h1>
+<form method="post" class="card narrow">
+    <input type="hidden" asp-for="Id" />
+    <label>Nombre * <input asp-for="Name" required maxlength="100" autofocus placeholder="Ej. Bimbo, Coca-Cola" /></label>
+    <label>Contacto (vendedor / ruta) <input asp-for="Contact" maxlength="200" /></label>
+    <label>Teléfono <input asp-for="Phone" maxlength="40" /></label>
+    <fieldset>
+        <legend>Días en que visita</legend>
+        <div class="days">
+            @foreach (var d in week)
+            {
+                <label class="check"><input type="checkbox" name="Days" value="@d" checked="@Model.Days.Contains(d)" /> @DisplayNames.Of(d)</label>
+            }
+        </div>
+    </fieldset>
+    <label>Notas <textarea asp-for="Notes" rows="3" maxlength="1000"></textarea></label>
+    <label class="check"><input type="checkbox" asp-for="IsActive" /> Activo</label>
+    <div class="actions"><button class="btn primary">Guardar</button><a class="btn" href="/Suppliers">Cancelar</a></div>
+</form>

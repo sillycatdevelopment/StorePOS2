@@ -1,0 +1,49 @@
+@page
+@model StorePos.Web.Pages.Settings.BackupsModel
+@{ ViewData["Title"] = "Respaldos"; }
+<h1>Respaldos</h1>
+<partial name="_Nav" />
+<div class="grid c2">
+    <div class="card">
+        <h2>Respaldo manual</h2>
+        <p class="small">Base de datos: <code>@Model.DatabasePath</code><br />Carpeta de respaldos: <code>@Model.Directory</code></p>
+        <form method="post" asp-page-handler="Create"><button class="btn primary">Crear respaldo ahora</button></form>
+        <p class="muted small">Se usa la función de respaldo en línea de SQLite: es seguro hacerlo mientras se vende. Copia también los archivos a una memoria USB o a la nube de vez en cuando.</p>
+    </div>
+    <form method="post" asp-page-handler="Config" class="card">
+        <h2>Respaldos automáticos</h2>
+        <label class="check"><input type="checkbox" name="autoEnabled" value="true" checked="@Model.AutoEnabled" /> Activados</label><input type="hidden" name="autoEnabled" value="false" />
+        <div class="form-grid">
+            <label>Cada cuántas horas <input name="intervalHours" type="number" min="1" value="@Model.IntervalHours" /></label>
+            <label>Conservar los últimos <input name="keepCount" type="number" min="3" value="@Model.KeepCount" /></label>
+        </div>
+        <label>Carpeta (vacío = junto a la base de datos) <input name="directory" value="@Model.ConfiguredDirectory" placeholder="D:\Respaldos\StorePOS" /></label>
+        <p class="muted small">Último respaldo automático: @(string.IsNullOrEmpty(Model.LastAuto) ? "nunca" : Model.LastAuto.Replace("T", " "))</p>
+        <button class="btn">Guardar</button>
+    </form>
+</div>
+<div class="card">
+    <h2>Respaldos disponibles</h2>
+    <table>
+        <thead><tr><th>Archivo</th><th>Fecha</th><th class="num">Tamaño</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var f in Model.Files)
+        {
+            <tr><td>@f.Name</td><td>@F.DT(f.CreatedAt)</td><td class="num">@((f.SizeBytes / 1024.0 / 1024.0).ToString("0.00")) MB</td>
+                <td class="actions">
+                    <a class="btn small" href="?handler=Download&name=@Uri.EscapeDataString(f.Name)">Descargar</a>
+                    <form method="post" asp-page-handler="Restore" data-confirm="¿Restaurar @f.Name? Los datos actuales se reemplazarán (antes se hará un respaldo de seguridad).">
+                        <input type="hidden" name="name" value="@f.Name" /><button class="btn small danger">Restaurar</button>
+                    </form>
+                </td></tr>
+        }
+        @if (Model.Files.Count == 0) { <tr><td colspan="4" class="muted">No hay respaldos todavía.</td></tr> }
+        </tbody>
+    </table>
+</div>
+<form method="post" asp-page-handler="Upload" enctype="multipart/form-data" class="card narrow" data-confirm="¿Restaurar desde este archivo? Los datos actuales se reemplazarán (antes se hará un respaldo de seguridad).">
+    <h2>Restaurar desde un archivo</h2>
+    <input type="file" name="file" accept=".db" required />
+    <p></p>
+    <button class="btn danger">Subir y restaurar</button>
+</form>

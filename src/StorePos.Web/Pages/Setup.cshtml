@@ -1,0 +1,15 @@
+@page
+@model StorePos.Web.Pages.SetupModel
+@{ ViewData["Title"] = "Configuración inicial"; }
+<div class="login-box card">
+    <h1>Bienvenido a StorePOS 2.0</h1>
+    <p>Crea la cuenta del <strong>administrador</strong>. Después podrás crear usuarios para encargados y cajeros.</p>
+    <form method="post">
+        <label>Nombre de la tienda <input name="StoreName" value="Mi Tienda" required /></label>
+        <label>Tu nombre <input name="DisplayName" required /></label>
+        <label>Usuario <input name="Username" required autocomplete="username" /></label>
+        <label>Contraseña (mínimo 4 caracteres) <input name="Password" type="password" required minlength="4" autocomplete="new-password" /></label>
+        <label>Primer dueño de mercancía <input name="OwnerName" placeholder="Ej. tu nombre" required /></label>
+        <button class="btn primary wide">Crear y entrar</button>
+    </form>
+</div>

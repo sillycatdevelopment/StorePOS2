@@ -1,0 +1,21 @@
+@page
+@model StorePos.Web.Pages.Suppliers.DeliveryDetailsModel
+@{ var d = Model.Delivery; ViewData["Title"] = $"Entrega #{d.Id}"; }
+<div class="toolbar"><h1>Entrega #@d.Id — @d.Supplier!.Name</h1><span class="spacer"></span><a class="btn" href="#" data-print>Imprimir</a></div>
+<div class="card">
+    <p>Recibida: <strong>@F.DT(d.ReceivedAt)</strong> por @d.User?.DisplayName · Factura: @(d.InvoiceNumber ?? "—")
+        @if (d.StockingListId is int lid) { <span> · Desde la <a href="/Stocking/Edit?id=@lid">lista de surtido #@lid</a></span> }</p>
+    @if (d.Notes is not null) { <p class="muted">@d.Notes</p> }
+    <table>
+        <thead><tr><th>Producto</th><th>Dueño</th><th class="num">Cantidad</th><th class="num">Costo unitario</th><th class="num">Importe</th></tr></thead>
+        <tbody>
+        @foreach (var i in d.Items)
+        {
+            <tr><td><a href="/Inventory/Product?id=@i.ProductId">@i.Product!.Name</a></td><td>@i.Owner!.Name</td>
+                <td class="num">@F.Q(i.Quantity, i.Product.Unit)</td><td class="num">@F.M(i.UnitCostCents)</td><td class="num">@F.M(i.LineCostCents)</td></tr>
+        }
+        <tr class="total"><td colspan="4">Total</td><td class="num">@F.M(d.TotalCostCents)</td></tr>
+        </tbody>
+    </table>
+</div>
+<a class="btn" href="/Suppliers/Deliveries">Volver</a>

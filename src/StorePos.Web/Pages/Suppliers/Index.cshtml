@@ -1,0 +1,41 @@
+@page
+@model StorePos.Web.Pages.Suppliers.IndexModel
+@{ ViewData["Title"] = "Proveedores y surtidores"; }
+<div class="toolbar">
+    <h1>Proveedores y surtidores</h1><span class="spacer"></span>
+    <a class="btn" href="/Suppliers/Deliveries">Historial de entregas</a>
+    <a class="btn primary" href="/Suppliers/Delivery">Registrar entrega</a>
+    <a class="btn" href="/Suppliers/Edit">+ Nuevo proveedor</a>
+</div>
+<div class="grid c2">
+    <div class="card">
+        <h2>Proveedores</h2>
+        <table>
+            <thead><tr><th>Proveedor</th><th>Días de visita</th><th class="num">Productos</th><th>Contacto</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var s in Model.Suppliers)
+            {
+                <tr>
+                    <td>@s.Name @if (!s.IsActive) { <span class="badge">inactivo</span> }</td>
+                    <td>@(s.Schedules.Count == 0 ? "—" : string.Join(", ", s.Schedules.OrderBy(d => ((int)d.Day + 6) % 7).Select(d => DisplayNames.Of(d.Day))))</td>
+                    <td class="num"><a href="/Products?supplierId=@s.Id">@Model.ProductCounts.GetValueOrDefault(s.Id)</a></td>
+                    <td class="small">@s.Contact @s.Phone</td>
+                    <td class="actions"><a class="btn small" href="/Suppliers/Delivery?supplierId=@s.Id">Entrega</a><a class="btn small" href="/Suppliers/Edit?id=@s.Id">Editar</a></td>
+                </tr>
+            }
+            @if (Model.Suppliers.Count == 0) { <tr><td colspan="5" class="muted">Aún no hay proveedores.</td></tr> }
+            </tbody>
+        </table>
+        <p class="muted small">Los productos que surte cada proveedor se definen con el “proveedor habitual” de cada producto.</p>
+    </div>
+    <div class="card">
+        <h2>Próximos 7 días</h2>
+        <ul class="list-plain">
+            @foreach (var g in Model.Upcoming.GroupBy(u => u.Date))
+            {
+                <li><strong>@(g.Key == Model.Today ? "Hoy" : F.Long(g.Key))</strong>
+                    <span>@foreach (var u in g) { <span class="badge @(u.ReceivedToday ? "ok" : "")">@u.SupplierName</span> }</span></li>
+            }
+        </ul>
+    </div>
+</div>

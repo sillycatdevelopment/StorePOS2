@@ -1,0 +1,13 @@
+@model PagerModel
+@if (Model.TotalPages > 1)
+{
+    <nav class="pager">
+        @if (Model.Page > 1) { <a href="@Model.Url(1)">« Primera</a> <a href="@Model.Url(Model.Page - 1)">‹ Anterior</a> }
+        <span>Página @Model.Page de @Model.TotalPages (@Model.TotalCount.ToString("N0") registros)</span>
+        @if (Model.Page < Model.TotalPages) { <a href="@Model.Url(Model.Page + 1)">Siguiente ›</a> <a href="@Model.Url(Model.TotalPages)">Última »</a> }
+    </nav>
+}
+else if (Model.TotalCount > 0)
+{
+    <p class="muted small">@Model.TotalCount.ToString("N0") registros</p>
+}

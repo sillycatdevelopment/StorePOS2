@@ -1,0 +1,33 @@
+@page
+@model StorePos.Web.Pages.Stocking.ReceiveModel
+@{ var l = Model.List; ViewData["Title"] = "Recibir: " + l.Name; }
+<h1>Recibir mercancía — @l.Name</h1>
+<p class="muted">Escribe lo que <strong>realmente llegó</strong> y su costo. Los renglones en 0 no se ingresan. Se crea una entrega por proveedor y un lote por dueño.</p>
+<form method="post" asp-route-id="@l.Id" class="card" data-confirm="¿Ingresar esta mercancía al inventario?">
+    <label>Factura / nota <input name="InvoiceNumber" maxlength="60" style="max-width:300px" /></label>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Producto</th><th>Proveedor</th><th>Dueño</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Costo unitario real</th></tr></thead>
+        <tbody>
+        @{ int n = 0; }
+        @foreach (var i in l.Items.OrderBy(x => x.Supplier?.Name).ThenBy(x => x.Description))
+        {
+            var unit = i.Product?.Unit ?? UnitType.Piece;
+            <tr>
+                <td>@i.Description <input type="hidden" name="Rows[@n].ItemId" value="@i.Id" />
+                    @if (i.ProductId is null) { <div class="small" style="color:var(--bad)">No es un producto registrado: <a href="/Products/Edit?name=@Uri.EscapeDataString(i.Description)" target="_blank">darlo de alta</a> y agregarlo a la lista.</div> }</td>
+                <td><select name="Rows[@n].SupplierId"><option value="">—</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(i.SupplierId == s.Id)">@s.Name</option> }</select></td>
+                <td><select name="Rows[@n].OwnerId"><option value="">—</option>@foreach (var o in Model.Owners) { <option value="@o.Id" selected="@(i.OwnerId == o.Id)">@o.Name</option> }</select></td>
+                <td class="num">@(i.ProductId is null ? i.Quantity.ToString() : F.Q(i.Quantity, unit))</td>
+                <td class="num"><input class="qty" name="Rows[@n].Qty" type="number" min="0" step="@(unit == UnitType.Kilogram ? "0.001" : "1")" value="@(i.ProductId is null ? 0 : F.QIn(i.Quantity, unit))" disabled="@(i.ProductId is null)" /></td>
+                <td class="num"><input class="money" name="Rows[@n].Cost" type="number" min="0" step="0.01" value="@F.P(i.EstimatedUnitCostCents)" /></td>
+            </tr>
+            n++;
+        }
+        </tbody>
+    </table>
+    </div>
+    <label class="check"><input type="checkbox" name="UpdateReferenceCost" value="true" checked /> Actualizar el precio de compra de referencia con el costo real</label>
+    <input type="hidden" name="UpdateReferenceCost" value="false" />
+    <div class="actions"><button class="btn primary">Ingresar al inventario</button><a class="btn" href="/Stocking/Edit?id=@l.Id">Volver</a></div>
+</form>

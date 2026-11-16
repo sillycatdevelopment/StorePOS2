@@ -1,0 +1,33 @@
+@page
+@model StorePos.Web.Pages.Settings.UsersModel
+@{ ViewData["Title"] = "Usuarios"; var roles = new[] { UserRole.Cashier, UserRole.Manager, UserRole.Administrator }; }
+<h1>Usuarios</h1>
+<partial name="_Nav" />
+<div class="card">
+    <p class="small"><strong>Cajero:</strong> vender, abrir/cerrar caja, registrar solicitudes y gastos. <strong>Encargado:</strong> además descuentos, cancelaciones, inventario, dueños, proveedores, surtido, reportes y retiros de caja. <strong>Administrador:</strong> todo, incluidos usuarios, configuración y respaldos.</p>
+    <table>
+        <thead><tr><th>Usuario</th><th>Nombre / rol / estado / nueva contraseña</th><th>Último acceso</th></tr></thead>
+        <tbody>
+        @foreach (var u in Model.Users)
+        {
+            <tr><td><strong>@u.Username</strong></td><td>
+                <form method="post" asp-page-handler="Update" class="toolbar" style="margin:0">
+                    <input type="hidden" name="id" value="@u.Id" />
+                    <input name="displayName" value="@u.DisplayName" maxlength="100" />
+                    <select name="role">@foreach (var r in roles) { <option value="@r" selected="@(u.Role == r)">@r.Display()</option> }</select>
+                    <label class="check"><input type="checkbox" name="isActive" value="true" checked="@u.IsActive" /> Activo</label><input type="hidden" name="isActive" value="false" />
+                    <input name="newPassword" type="password" placeholder="Nueva contraseña (opcional)" autocomplete="new-password" />
+                    <button class="btn small">Guardar</button>
+                </form></td><td>@F.DT(u.LastLoginAt)</td></tr>
+        }
+        </tbody>
+    </table>
+</div>
+<form method="post" asp-page-handler="Create" class="card narrow">
+    <h2>Nuevo usuario</h2>
+    <label>Usuario <input name="username" required maxlength="50" autocomplete="off" /></label>
+    <label>Nombre para mostrar <input name="displayName" required maxlength="100" /></label>
+    <label>Contraseña <input name="password" type="password" required minlength="4" autocomplete="new-password" /></label>
+    <label>Rol <select name="role">@foreach (var r in roles) { <option value="@r">@r.Display()</option> }</select></label>
+    <button class="btn primary">Crear usuario</button>
+</form>

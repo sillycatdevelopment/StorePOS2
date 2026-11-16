@@ -1,0 +1,29 @@
+@page
+@model StorePos.Web.Pages.Cash.CloseModel
+@{ ViewData["Title"] = "Corte de caja"; var expected = Model.Summary.ExpectedCashCents; }
+<h1>Corte de caja — @F.D(Model.Summary.Closing.BusinessDate)</h1>
+<partial name="_Summary" model="Model.Summary" />
+<form method="post" class="card narrow">
+    <h2>Cerrar el día</h2>
+    <p>Efectivo esperado: <strong>@F.M(expected)</strong></p>
+    <label>Efectivo contado en caja ($) * <input name="Counted" id="counted" type="number" step="0.01" min="0" value="@Model.Counted" required autofocus /></label>
+    <p>Diferencia: <strong id="diff">—</strong></p>
+    <label>Notas / explicación de la diferencia <textarea name="Notes" rows="3" maxlength="1000">@Model.Notes</textarea></label>
+    <p class="muted small">Si el contado no coincide con lo esperado, la explicación es obligatoria. Un día cerrado ya no se puede modificar.</p>
+    <button class="btn primary" data-confirm="¿Cerrar el día? Esta acción no se puede deshacer.">Guardar corte y cerrar</button>
+</form>
+@section Scripts {
+<script>
+(function () {
+  var expected = @expected, input = document.getElementById('counted'), out = document.getElementById('diff');
+  var fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+  function upd() {
+    if (input.value === '') { out.textContent = '—'; return; }
+    var d = Math.round(parseFloat(input.value) * 100) - expected;
+    out.textContent = fmt.format(d / 100) + (d === 0 ? ' (cuadra)' : d > 0 ? ' (sobrante)' : ' (faltante)');
+    out.style.color = d === 0 ? 'var(--ok)' : 'var(--bad)';
+  }
+  input.addEventListener('input', upd); upd();
+})();
+</script>
+}

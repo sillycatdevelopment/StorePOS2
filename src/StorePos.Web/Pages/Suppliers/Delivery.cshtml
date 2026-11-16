@@ -1,0 +1,82 @@
+@page
+@model StorePos.Web.Pages.Suppliers.DeliveryModel
+@{ ViewData["Title"] = "Registrar entrega"; }
+<h1>Registrar entrega de proveedor</h1>
+<form method="post" class="card" id="deliveryForm">
+    <div class="form-grid">
+        <label>Proveedor *
+            <select name="SupplierId" required>
+                <option value="">— elegir —</option>
+                @foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(Model.SupplierId == s.Id)">@s.Name</option> }
+            </select>
+        </label>
+        <label>Factura / nota de remisión <input name="InvoiceNumber" value="@Model.InvoiceNumber" maxlength="60" /></label>
+        <label>Dueño por defecto
+            <select id="defaultOwner">
+                @foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }
+            </select>
+        </label>
+    </div>
+    <label>Agregar producto (escanea o escribe)
+        <input id="find" autocomplete="off" placeholder="Código o nombre…" />
+    </label>
+    <div id="found" class="results" hidden style="border:1px solid var(--line);max-height:240px;overflow:auto"></div>
+    <div class="table-wrap" style="margin-top:10px">
+    <table>
+        <thead><tr><th>Producto</th><th>Dueño</th><th class="num">Cantidad</th><th class="num">Costo unitario</th><th class="num">Importe</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot><tr class="total"><td colspan="4">Total</td><td class="num" id="sum">$0.00</td><td></td></tr></tfoot>
+    </table>
+    </div>
+    <label>Notas <input name="Notes" value="@Model.Notes" maxlength="1000" /></label>
+    <label class="check"><input type="checkbox" name="UpdateReferenceCost" value="true" checked="@Model.UpdateReferenceCost" /> Actualizar el precio de compra de referencia de cada producto con este costo</label>
+    <input type="hidden" name="UpdateReferenceCost" value="false" />
+    <div class="actions"><button class="btn primary">Guardar entrega y agregar a inventario</button><a class="btn" href="/Suppliers">Cancelar</a></div>
+</form>
+<template id="ownerOptions">@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</template>
+@section Scripts {
+<script>
+(function () {
+  var find = document.getElementById('find'), found = document.getElementById('found'), rows = document.getElementById('rows');
+  var ownerTpl = document.getElementById('ownerOptions').innerHTML, defOwner = document.getElementById('defaultOwner');
+  var fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }), timer, list = [], n = 0;
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function search(q, autoAdd) {
+    fetch('/Suppliers/Delivery?handler=Search&q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (res) {
+      list = res;
+      if (autoAdd && res.length === 1) { addRow(res[0]); return; }
+      found.innerHTML = res.map(function (p, i) { return '<button type="button" class="btn wide" style="text-align:left;border:0;border-bottom:1px solid var(--line)" data-i="' + i + '">' + esc(p.name) + ' <span class="muted small">' + esc(p.barcode || '') + '</span></button>'; }).join('') || '<div class="muted" style="padding:8px">Sin resultados. <a href="/Products/Edit?barcode=' + encodeURIComponent(q) + '" target="_blank">Registrar producto nuevo</a></div>';
+      found.hidden = false;
+    });
+  }
+  function addRow(p) {
+    var i = n++;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + esc(p.name) + '<input type="hidden" name="Items[' + i + '].ProductId" value="' + p.id + '"></td>' +
+      '<td><select name="Items[' + i + '].OwnerId">' + ownerTpl + '</select></td>' +
+      '<td class="num"><input class="qty" name="Items[' + i + '].Qty" type="number" min="0" step="' + (p.unit === 1 ? '0.001' : '1') + '" required> ' + (p.unit === 1 ? 'kg' : 'pza') + '</td>' +
+      '<td class="num"><input class="money" name="Items[' + i + '].UnitCost" type="number" min="0" step="0.01" value="' + p.cost.toFixed(2) + '" required></td>' +
+      '<td class="num line">$0.00</td><td><button type="button" class="btn small rm">✕</button></td>';
+    tr.querySelector('select').value = p.ownerId || defOwner.value;
+    rows.appendChild(tr);
+    found.hidden = true; find.value = '';
+    tr.querySelector('.qty').focus();
+  }
+  function sum() {
+    var t = 0;
+    rows.querySelectorAll('tr').forEach(function (tr) {
+      var q = parseFloat(tr.querySelector('.qty').value) || 0, c = parseFloat(tr.querySelector('.money').value) || 0;
+      tr.querySelector('.line').textContent = fmt.format(q * c); t += q * c;
+    });
+    document.getElementById('sum').textContent = fmt.format(t);
+  }
+  find.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); if (find.value.trim()) search(find.value.trim(), true); } });
+  find.addEventListener('input', function () { clearTimeout(timer); var q = find.value.trim(); if (q.length >= 2 && !/^\d+$/.test(q)) timer = setTimeout(function () { search(q, false); }, 250); });
+  found.addEventListener('click', function (e) { var b = e.target.closest('button[data-i]'); if (b) addRow(list[+b.dataset.i]); });
+  rows.addEventListener('input', sum);
+  rows.addEventListener('click', function (e) { if (e.target.classList.contains('rm')) { e.target.closest('tr').remove(); sum(); } });
+  rows.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); find.focus(); } });
+  document.getElementById('deliveryForm').addEventListener('submit', function (e) { if (!rows.children.length) { e.preventDefault(); alert('Agrega al menos un producto.'); } });
+})();
+</script>
+}

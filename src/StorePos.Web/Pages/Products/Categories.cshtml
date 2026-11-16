@@ -1,0 +1,30 @@
+@page
+@model StorePos.Web.Pages.Products.CategoriesModel
+@{ ViewData["Title"] = "Categorías"; }
+<h1>Categorías</h1>
+<form method="post" class="toolbar card">
+    <label>Nueva categoría <input name="name" required maxlength="80" /></label>
+    <input type="hidden" name="isActive" value="true" />
+    <button class="btn primary">Agregar</button>
+</form>
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var c in Model.Categories)
+    {
+        <tr>
+            <td colspan="3">
+                <form method="post" class="toolbar" style="margin:0">
+                    <input type="hidden" name="id" value="@c.Id" />
+                    <input name="name" value="@c.Name" required maxlength="80" />
+                    <label class="check"><input type="checkbox" name="isActive" value="true" checked="@c.IsActive" /> Activa</label>
+                    <input type="hidden" name="isActive" value="false" />
+                    <button class="btn small">Guardar</button>
+                </form>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+</div>

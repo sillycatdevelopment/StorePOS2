@@ -1,0 +1,16 @@
+@model (PeriodPreset Period, DateOnly From, DateOnly To)
+<label>Periodo
+    <select name="period" onchange="this.closest('form').querySelector('.custom-dates').style.display = this.value === 'Custom' ? '' : 'none'">
+        <option value="Today" selected="@(Model.Period == PeriodPreset.Today)">Hoy</option>
+        <option value="Yesterday" selected="@(Model.Period == PeriodPreset.Yesterday)">Ayer</option>
+        <option value="ThisWeek" selected="@(Model.Period == PeriodPreset.ThisWeek)">Esta semana</option>
+        <option value="ThisMonth" selected="@(Model.Period == PeriodPreset.ThisMonth)">Este mes</option>
+        <option value="LastMonth" selected="@(Model.Period == PeriodPreset.LastMonth)">Mes pasado</option>
+        <option value="ThisYear" selected="@(Model.Period == PeriodPreset.ThisYear)">Este año</option>
+        <option value="Custom" selected="@(Model.Period == PeriodPreset.Custom)">Personalizado…</option>
+    </select>
+</label>
+<span class="custom-dates" style="@(Model.Period == PeriodPreset.Custom ? "" : "display:none")">
+    <label>Desde <input type="date" name="from" value="@F.Iso(Model.From)" /></label>
+    <label>Hasta <input type="date" name="to" value="@F.Iso(Model.To)" /></label>
+</span>

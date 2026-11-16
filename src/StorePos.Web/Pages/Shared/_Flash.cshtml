@@ -1,0 +1,6 @@
+@{
+    var ok = TempData["Flash"] as string;
+    var err = TempData["FlashError"] as string ?? (ViewContext.ViewData.Model as AppPageModel)?.ErrorMessage;
+}
+@if (!string.IsNullOrEmpty(ok)) { <div class="alert ok">@ok</div> }
+@if (!string.IsNullOrEmpty(err)) { <div class="alert error">@err</div> }

@@ -1,0 +1,81 @@
+@page
+@model StorePos.Web.Pages.Reports.ExportModel
+@{
+    ViewData["Title"] = "Exportar a Excel";
+    var pick = (PeriodPreset.ThisMonth, new DateOnly(Model.Today.Year, Model.Today.Month, 1), Model.Today);
+}
+<h1>Exportar a Excel</h1>
+<div class="grid c2">
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Sales" />
+        <h2>Ventas (diarias, mensuales o anuales)</h2>
+        <div class="toolbar"><partial name="_PeriodPicker" model="pick" /></div>
+        <div class="form-grid">
+            <label>Agrupar
+                <select name="grouping"><option value="day">Por día</option><option value="month">Por mes</option><option value="year">Por año</option></select>
+            </label>
+            <label>Dueño <select name="ownerId"><option value="">Todos</option>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</select></label>
+        </div>
+        <button class="btn primary">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Profit" />
+        <h2>Ganancias (por dueño, producto, categoría, proveedor, mes)</h2>
+        <div class="toolbar"><partial name="_PeriodPicker" model="pick" /></div>
+        <label>Dueño <select name="ownerId"><option value="">Todos</option>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</select></label>
+        <button class="btn primary">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Owner" />
+        <h2>Reporte de un dueño</h2>
+        <div class="toolbar"><partial name="_PeriodPicker" model="pick" /></div>
+        <label>Dueño * <select name="ownerId" required>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</select></label>
+        <button class="btn primary">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Inventory" />
+        <h2>Inventario</h2>
+        <div class="form-grid">
+            <label>Contenido
+                <select name="status">
+                    <option value="All">Todo el inventario</option>
+                    <option value="Low">Existencia baja</option>
+                    <option value="Out">Agotados</option>
+                    <option value="InStock">Solo con existencia</option>
+                </select>
+            </label>
+            <label>Dueño <select name="ownerId"><option value="">Todos</option>@foreach (var o in Model.Owners) { <option value="@o.Id">@o.Name</option> }</select></label>
+        </div>
+        <button class="btn primary">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Deliveries" />
+        <h2>Entregas de proveedores</h2>
+        <div class="toolbar"><partial name="_PeriodPicker" model="pick" /></div>
+        <label>Proveedor <select name="supplierId"><option value="">Todos</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id">@s.Name</option> }</select></label>
+        <button class="btn primary">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Closings" />
+        <h2>Cortes de caja</h2>
+        <div class="toolbar"><partial name="_PeriodPicker" model="pick" /></div>
+        <button class="btn primary">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Stocking" />
+        <h2>Lista de surtido</h2>
+        <label>Lista <select name="listId" required>@foreach (var l in Model.Lists) { <option value="@l.Id">#@l.Id @l.Name (@DisplayNames.Of(l.Status))</option> }</select></label>
+        <button class="btn primary" disabled="@(Model.Lists.Count == 0)">Descargar</button>
+    </form>
+    <form method="get" class="card">
+        <input type="hidden" name="handler" value="Requests" />
+        <h2>Solicitudes de clientes</h2>
+        <label>Estado
+            <select name="status">
+                <option value="">Todas</option>
+                @foreach (var s in Enum.GetValues<RequestStatus>()) { <option value="@s">@DisplayNames.Of(s)</option> }
+            </select>
+        </label>
+        <button class="btn primary">Descargar</button>
+    </form>
+</div>

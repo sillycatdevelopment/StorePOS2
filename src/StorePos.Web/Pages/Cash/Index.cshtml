@@ -1,0 +1,42 @@
+@page
+@model StorePos.Web.Pages.Cash.IndexModel
+@{ ViewData["Title"] = "Caja y corte"; }
+<div class="toolbar">
+    <h1>Caja y corte del día</h1><span class="spacer"></span>
+    @if (Model.IsManager) { <a class="btn" href="/Cash/History">Cortes anteriores</a> }
+</div>
+@if (Model.Summary is null)
+{
+    <form method="post" asp-page-handler="Open" class="card narrow">
+        <h2>Abrir caja</h2>
+        <label>Fondo inicial en efectivo ($) <input name="openingCash" type="number" step="0.01" min="0" value="0" required autofocus /></label>
+        <button class="btn primary">Abrir caja</button>
+    </form>
+}
+else
+{
+    var c = Model.Summary.Closing;
+    <p>Caja abierta el <strong>@F.DT(c.OpenedAt)</strong> por @c.OpenedByUser?.DisplayName.
+        <a class="btn primary" href="/Cash/Close?id=@c.Id">Hacer corte y cerrar el día</a></p>
+    <partial name="_Summary" model="Model.Summary" />
+    <form method="post" asp-page-handler="Movement" class="card">
+        <h2>Registrar movimiento de efectivo</h2>
+        <div class="form-grid">
+            <label>Tipo
+                <select name="type" id="mvType">
+                    <option value="@CashMovementType.Expense">Gasto</option>
+                    <option value="@CashMovementType.Deposit">Depósito a caja (entra efectivo)</option>
+                    @if (Model.IsManager) { <option value="@CashMovementType.Withdrawal">Retiro de caja (sale efectivo)</option> }
+                    <option value="@CashMovementType.Refund">Reembolso a cliente</option>
+                    <option value="@CashMovementType.OtherIn">Otra entrada</option>
+                    @if (Model.IsManager) { <option value="@CashMovementType.OtherOut">Otra salida</option> }
+                </select>
+            </label>
+            <label>Monto ($) <input name="amount" type="number" step="0.01" min="0.01" required /></label>
+            <label>Descripción * <input name="description" maxlength="300" required placeholder="Ej. Pago de garrafón, cambio para la caja" /></label>
+        </div>
+        <label class="check"><input type="checkbox" name="affectsCash" value="true" checked /> Se pagó / recibió en efectivo de la caja</label>
+        <input type="hidden" name="affectsCash" value="false" />
+        <button class="btn">Registrar</button>
+    </form>
+}

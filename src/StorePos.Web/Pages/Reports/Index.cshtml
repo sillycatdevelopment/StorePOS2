@@ -1,0 +1,46 @@
+@page
+@model StorePos.Web.Pages.Reports.IndexModel
+@{ ViewData["Title"] = "Reportes financieros"; var s = Model.Summary; }
+<div class="toolbar">
+    <h1>Reportes financieros</h1><span class="spacer"></span>
+    <a class="btn" href="/Reports/Trends">Tendencias y recomendaciones</a>
+    <a class="btn primary" href="/Reports/Export">Exportar a Excel</a>
+</div>
+<form method="get" class="toolbar card">
+    <partial name="_PeriodPicker" model="(Model.Period, Model.Range.From, Model.Range.To)" />
+    <label>Dueño
+        <select name="ownerId">
+            <option value="">Todos</option>
+            @foreach (var o in Model.Owners) { <option value="@o.Id" selected="@(Model.OwnerId == o.Id)">@o.Name</option> }
+        </select>
+    </label>
+    <label>Agrupar por
+        <select name="group">
+            <option value="day" selected="@(Model.Group == "day")">Día</option>
+            <option value="week" selected="@(Model.Group == "week")">Semana</option>
+            <option value="month" selected="@(Model.Group == "month")">Mes</option>
+            <option value="year" selected="@(Model.Group == "year")">Año</option>
+        </select>
+    </label>
+    <button class="btn">Ver</button>
+    <span class="muted small">@F.D(Model.Range.From) al @F.D(Model.Range.To)</span>
+</form>
+<div class="grid k4">
+    <div class="kpi"><div class="label">Ingresos</div><div class="value">@F.M(s.RevenueCents)</div></div>
+    <div class="kpi"><div class="label">Costo de lo vendido</div><div class="value">@F.M(s.CostCents)</div></div>
+    <div class="kpi good"><div class="label">Ganancia bruta</div><div class="value">@F.M(s.ProfitCents)</div><div class="small muted">Margen @(s.RevenueCents == 0 ? "—" : F.Pct(s.ProfitCents / (double)s.RevenueCents))</div></div>
+    <div class="kpi"><div class="label">Tickets</div><div class="value">@s.SaleCount</div><div class="small muted">Promedio @F.M(s.AverageTicketCents) · @s.CancelledCount cancelados</div></div>
+    <div class="kpi"><div class="label">Descuentos otorgados</div><div class="value">@F.M(s.DiscountCents)</div></div>
+</div>
+@{
+    var periodTitle = Model.Group switch { "week" => "Ventas por semana", "month" => "Ventas por mes", "year" => "Ventas por año", _ => "Ventas por día" };
+}
+<div style="margin-top:14px">@await Html.PartialAsync("_GroupTable", (periodTitle, Model.ByPeriod))</div>
+<div class="grid c2">
+    @if (Model.OwnerId is null) { <div>@await Html.PartialAsync("_GroupTable", ("Por dueño", Model.ByOwner))</div> }
+    @await Html.PartialAsync("_GroupTable", ("Por forma de pago", Model.ByPayment))
+    @await Html.PartialAsync("_GroupTable", ("Por categoría", Model.ByCategory))
+    @await Html.PartialAsync("_GroupTable", ("Por proveedor", Model.BySupplier))
+    @await Html.PartialAsync("_ProductTable", ("Más vendidos", Model.Best))
+    @await Html.PartialAsync("_ProductTable", ("Menos vendidos (productos activos)", Model.Worst))
+</div>

@@ -1,0 +1,88 @@
+@page
+@model IndexModel
+@{ ViewData["Title"] = "Tablero"; }
+<div class="toolbar">
+    <h1>Tablero <span class="muted small">— @F.Long(Model.Date)</span></h1>
+    <span class="spacer"></span>
+    <a class="btn primary" href="/Pos">Ir al punto de venta <span class="kbd">F2</span></a>
+    <a class="btn" href="/Requests">+ Producto solicitado</a>
+</div>
+
+@if (Model.OpenDay is null)
+{
+    <div class="alert warn">La caja está <strong>cerrada</strong>. <a href="/Cash">Abrir caja</a> para empezar a vender.</div>
+}
+
+<div class="grid k4">
+    <div class="kpi"><div class="label">Ventas de hoy</div><div class="value">@F.M(Model.Today.RevenueCents)</div><div class="small muted">@Model.Today.SaleCount tickets</div></div>
+    @if (Model.IsManager)
+    {
+        <div class="kpi good"><div class="label">Ganancia bruta de hoy</div><div class="value">@F.M(Model.Today.ProfitCents)</div></div>
+        <div class="kpi"><div class="label">Inventario (a costo)</div><div class="value">@F.M(Model.InventoryValue.Cost)</div><div class="small muted">A precio de venta: @F.M(Model.InventoryValue.Retail)</div></div>
+    }
+    <a class="kpi @(Model.OutCount > 0 ? "bad" : "")" href="/Inventory?Status=Out" style="text-decoration:none;color:inherit"><div class="label">Productos agotados</div><div class="value">@Model.OutCount</div></a>
+    <a class="kpi @(Model.LowCount > 0 ? "warn" : "")" href="/Inventory?Status=Low" style="text-decoration:none;color:inherit"><div class="label">Con existencia baja</div><div class="value">@Model.LowCount</div></a>
+    <a class="kpi" href="/Requests" style="text-decoration:none;color:inherit"><div class="label">Solicitudes pendientes</div><div class="value">@Model.PendingRequests</div></a>
+    <a class="kpi" href="/Cash" style="text-decoration:none;color:inherit">
+        <div class="label">Caja</div>
+        @if (Model.Cash is not null)
+        {
+            <div class="value">Abierta</div><div class="small muted">Efectivo esperado: @F.M(Model.Cash.ExpectedCashCents)</div>
+        }
+        else { <div class="value">Cerrada</div> }
+    </a>
+</div>
+
+<div class="grid c3" style="margin-top:14px">
+    <div class="card">
+        <h2>Próximas entregas</h2>
+        @if (Model.Upcoming.Count == 0) { <p class="muted">No hay proveedores con días de visita. <a href="/Suppliers">Configurar</a></p> }
+        <ul class="list-plain">
+            @foreach (var u in Model.Upcoming.Take(10))
+            {
+                <li><span>@(u.Date == Model.Date ? "Hoy" : u.Date == Model.Date.AddDays(1) ? "Mañana" : F.Long(u.Date))</span>
+                    <span>@u.SupplierName @if (u.ReceivedToday) { <span class="badge ok">recibido</span> }</span></li>
+            }
+        </ul>
+    </div>
+    <div class="card">
+        <h2>Demanda en aumento</h2>
+        @if (Model.TrendUp.Count == 0) { <p class="muted small">Sin productos con tendencia clara (se necesitan al menos 8 semanas de ventas).</p> }
+        <ul class="list-plain">
+            @foreach (var d in Model.TrendUp) { <li><a href="/Reports/Product?id=@d.ProductId">@d.Name</a><span class="badge ok">@(d.ChangeRatio is null ? "nuevo" : "+" + F.Pct(d.ChangeRatio.Value))</span></li> }
+        </ul>
+        <h2>Demanda a la baja</h2>
+        @if (Model.TrendDown.Count == 0) { <p class="muted small">Ninguno.</p> }
+        <ul class="list-plain">
+            @foreach (var d in Model.TrendDown) { <li><a href="/Reports/Product?id=@d.ProductId">@d.Name</a><span class="badge bad">@F.Pct(d.ChangeRatio ?? 0)</span></li> }
+        </ul>
+    </div>
+    <div class="card">
+        <h2>Lo que piden los clientes</h2>
+        @if (Model.TopRequests.Count == 0) { <p class="muted small">Sin solicitudes pendientes.</p> }
+        <ul class="list-plain">
+            @foreach (var r in Model.TopRequests) { <li><span>@r.ProductName</span><span class="badge warn">@r.RequestCount×</span></li> }
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Últimas ventas</h2>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>#</th><th>Hora</th><th>Productos</th><th>Pago</th><th class="num">Total</th>@if (Model.IsManager) { <th class="num">Ganancia</th> }<th>Cajero</th></tr></thead>
+        <tbody>
+        @foreach (var s in Model.Latest)
+        {
+            <tr class="@(s.Status == SaleStatus.Cancelled ? "cancelled" : "")">
+                <td><a href="/Sales/Details?id=@s.Id">@s.Id</a></td><td>@F.DT(s.CreatedAt)</td><td>@s.ItemCount</td><td>@s.PaymentMethodName</td>
+                <td class="num">@F.M(s.TotalCents)</td>@if (Model.IsManager) { <td class="num">@F.M(s.ProfitCents)</td> }<td>@s.UserName</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    </div>
+</div>
+@section Scripts {
+<script>document.addEventListener('keydown', function (e) { if (e.key === 'F2') { e.preventDefault(); location.href = '/Pos'; } });</script>
+}

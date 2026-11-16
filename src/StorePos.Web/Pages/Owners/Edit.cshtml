@@ -1,0 +1,13 @@
+@page
+@model StorePos.Web.Pages.Owners.EditModel
+@{ ViewData["Title"] = Model.Id is null ? "Nuevo dueño" : "Editar dueño"; }
+<h1>@ViewData["Title"]</h1>
+<form method="post" class="card narrow">
+    <input type="hidden" asp-for="Id" />
+    <label>Nombre * <input asp-for="Name" required maxlength="100" autofocus /></label>
+    <label>Contacto (teléfono, correo) <input asp-for="Contact" maxlength="200" /></label>
+    <label>Notas <textarea asp-for="Notes" rows="3" maxlength="1000"></textarea></label>
+    <label class="check"><input type="checkbox" asp-for="IsActive" /> Activo (puede recibir mercancía nueva)</label>
+    <p class="muted small">Un dueño inactivo conserva su historial y su existencia actual se puede seguir vendiendo.</p>
+    <div class="actions"><button class="btn primary">Guardar</button><a class="btn" href="/Owners">Cancelar</a></div>
+</form>

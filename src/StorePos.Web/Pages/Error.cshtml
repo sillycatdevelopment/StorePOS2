@@ -1,0 +1,7 @@
+@page
+@model StorePos.Web.Pages.ErrorModel
+@{ ViewData["Title"] = "Error"; }
+<h1>Ocurrió un error</h1>
+<p>La operación no se completó. Ningún dato quedó a medias: las ventas y movimientos se guardan en transacciones.</p>
+<p class="muted small">Referencia: @Model.RequestId</p>
+<a class="btn" href="/">Volver al tablero</a>
